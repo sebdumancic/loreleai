@@ -1,0 +1,4 @@
+pyswip
+problog
+ortools
+pytest
