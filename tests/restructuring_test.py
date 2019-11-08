@@ -76,7 +76,7 @@ class RestructuringMethods:
         all_cands = restruct._get_candidates(theory)
         cands = restruct._encode_theory(theory, all_cands)
 
-        redunds = restruct._find_redundancies(cands)
+        redunds, _ = restruct._find_redundancies(cands)
 
         assert len(redunds) == 0
 
@@ -93,7 +93,7 @@ class RestructuringMethods:
         all_cands = restruct._get_candidates(theory)
         cands = restruct._encode_theory(theory, all_cands)
 
-        redunds = restruct._find_redundancies(cands)
+        redunds, _ = restruct._find_redundancies(cands)
 
         assert len(redunds) == 3
 

@@ -170,6 +170,7 @@ class Restructor:
             encoded_clauses (Dict[Clause, Set[Set[Atom]]]): encoded clauses
         """
         redundancy_counts = {}
+        cooccurrence_counts = {}
 
         for cl in encoded_clauses:
             inner_counts = {}
@@ -185,6 +186,12 @@ class Restructor:
                                 if v not in var_indices:
                                     var_indices[v] = len(var_indices)
 
+                        # count coocurrences of latent predicates
+                        pred_tuple = tuple([x.get_predicate().get_name() for x in env_cmb])
+                        if pred_tuple not in cooccurrence_counts:
+                            cooccurrence_counts[pred_tuple] = 0
+                        cooccurrence_counts[pred_tuple] += 1
+
                         # create informative key (not depending on variable names)
                         env_cmb = tuple([f'{x.get_predicate().get_name()}({",".join([str(var_indices[y]) for y in x.get_variables()])})' for x in env_cmb])
 
@@ -197,7 +204,7 @@ class Restructor:
                     redundancy_counts[t] = 0
                 redundancy_counts[t] += 1
 
-        return [k for k, v in redundancy_counts.items() if v > 1]
+        return [k for k, v in redundancy_counts.items() if v > 1], [k for k, v in cooccurrence_counts.items() if v > 1]
 
     def restructure(self, clauses: Theory):
         """
@@ -218,6 +225,6 @@ class Restructor:
 
         clauses_encoded = self._encode_theory(clauses, all_candidates)
 
-        redundancies = self._find_redundancies(clauses_encoded)
+        redundancies, cooccurrences = self._find_redundancies(clauses_encoded)
 
         return redundancies
