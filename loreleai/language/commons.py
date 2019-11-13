@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Iterator, Union
+from typing import Dict, List, Tuple, Union, Sequence
 
 
 class Term:
@@ -27,6 +27,9 @@ class Term:
 
     def get_type(self):
         return self.type
+
+    def get_name(self):
+        return self.name
 
 
 @dataclass
@@ -237,11 +240,14 @@ class Not(Formula):
 
 class Theory:
 
-    def __init__(self, formulas: Iterator[Formula]):
+    def __init__(self, formulas: Sequence[Formula]):
         self._formulas = formulas
 
-    def get_formulas(self):
+    def get_formulas(self) -> Sequence[Formula]:
         return self._formulas
+
+    def __len__(self):
+        return len(self.get_formulas())
 
 
 def _create_term_signatures(literals: List[Union[Atom, Not]]) -> Dict[Term, Dict[Tuple[Predicate], int]]:
