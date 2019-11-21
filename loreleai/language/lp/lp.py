@@ -112,8 +112,9 @@ class Clause(Formula):
             clause (Clause): is self.clause part of this clause?
 
         Return:
-            a list of tuples, where the first elements of the tuple is the list of atoms that can be substituted
-            and the second element is the dictionary representing the mapping from variables in self.clause to the
+            a list of tuples:
+              - first elements of the tuple is the list of atoms that can be substituted
+              -  the second element is the dictionary representing the mapping from variables in self.clause to the
             variables is the provided clause
         """
         if isinstance(self, type(clause)):
@@ -197,14 +198,6 @@ class Clause(Formula):
                     _new_var_names_used_so_far = _new_var_names_used_so_far.union(var_names_used_here)
                     candidate_atoms.append(_substitute_vars_in_atoms(mcl.get_atoms(), var_subs_head, var_subs_body))
 
-                # matching_clauses = matching_clauses[0]
-                # var_subs_head, var_subs_body = _get_variable_map_unfolding(atm, matching_clauses, _new_var_names_used_so_far)
-                #
-                # # remember which auxiliary var names were used so far
-                # var_names_used_here = [v.get_name() for k, v in var_subs_body.items() if k not in matching_clauses.get_head().get_variables()]
-                # _new_var_names_used_so_far = _new_var_names_used_so_far.union(var_names_used_here)
-                #
-                # _new_body_atoms += _substitute_vars_in_atoms(matching_clauses.get_atoms(), var_subs_head, var_subs_body)
                 _new_body_atoms.append(candidate_atoms)
             else:
                 _new_body_atoms.append([[atm]])
@@ -284,35 +277,6 @@ class ClausalTheory(Theory):
                 final_exclusion = reduce(lambda x, y: x.union(y), [z[1] for z in final])
 
                 return final_clauses, final_exclusion.union(reduce(lambda x, y: x + y, used_clauses))
-            # elif all([len(matching_clauses_for_unfolding[k]) == 1 for k in matching_clauses_for_unfolding]):
-            #     used_clauses = [v[0] for k, v in matching_clauses_for_unfolding.items()]
-            #     _new_form = clause.unfold_with(used_clauses)
-            #
-            #     final_clauses = []
-            #     final = [_unfold_recursively(x, clause_index) for x in _new_form]
-            #
-            #     final_clauses = reduce(lambda x, y: x + y, [z[0] for z in final])
-            #     final_exclusion = reduce(lambda x, y: x.union(y), [z[1] for z in final])
-            #
-            #     # final_clauses, final_exclusion = _unfold_recursively(_new_form, clause_index)
-            #     return final_clauses, final_exclusion.union(used_clauses)
-            # else:
-            #     itms_to_use = [v for k, v in matching_clauses_for_unfolding.items()]
-            #     prod = product(*itms_to_use, repeat=2 if len(itms_to_use) == 1 else 1)
-            #     used_clauses = set(reduce(lambda x, y: x + y, [v for k, v in matching_clauses_for_unfolding.items()]))
-            #
-            #     _new_set_of_formulas = []
-            #     for cmb in prod:
-            #         _new_form = clause.unfold_with(cmb)
-            #         _new_set_of_formulas.append(_new_form)
-            #
-            #     #_new_set_of_formulas = [clause.unfold_with(cmb) for cmb in prod]
-            #     _new_set_of_formulas = [_unfold_recursively(y, clause_index) for x in _new_set_of_formulas for y in x]
-            #
-            #     final_clauses = reduce(lambda x, y: x + y, [x[0] for x in _new_set_of_formulas])
-            #     final_used = reduce(lambda x, y: x.union(y), [x[1] for x in _new_set_of_formulas])
-            #
-            #     return final_clauses, final_used.union(used_clauses)
 
         # create clause index
         clause_index = {}
@@ -361,6 +325,9 @@ def parse(string: str):
 def are_variables_connected(atoms: Sequence[Atom]):
     """
     Checks whether the Variables in the clause are connected
+
+    Args:
+        atoms (Sequence[Atom]): atoms whose variables have to be checked
 
     """
     g = nx.Graph()
