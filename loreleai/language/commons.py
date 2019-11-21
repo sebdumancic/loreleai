@@ -204,7 +204,7 @@ class Atom(Formula):
 
     def __eq__(self, other):
         if isinstance(self, type(other)):
-            return _are_two_set_of_literals_identical([self], [other])
+            return self.predicate == other.predicate and self.arguments == other.arguments  # _are_two_set_of_literals_identical([self], [other])
         else:
             return False
 
