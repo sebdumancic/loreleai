@@ -164,6 +164,7 @@ class Formula:
 
     def __init__(self):
         self._properties = {}
+        self._hash_cache = None
 
     def substitute(self, term_map: Dict[Term, Term]):
         raise Exception("Not implemented yet!")
@@ -181,7 +182,10 @@ class Formula:
         return self._properties.get(property_name, None)
 
     def __hash__(self):
-        return hash(self.__repr__())
+        if self._hash_cache is None:
+            self._hash_cache = hash(self.__repr__())
+
+        return self._hash_cache
 
 
 @dataclass
@@ -215,13 +219,10 @@ class Atom(Formula):
             return False
 
     def __hash__(self):
-        # if len(self.arg_signature) == 0:
-        #     tmp_ind = {}
-        #     for ind, v in enumerate(self.arguments):
-        #         if v not in tmp_ind:
-        #             tmp_ind[v] = ind + 1
-        #     self.arg_signature = ",".join([str(tmp_ind[x]) for x in self.arguments])
-        return hash(self.__repr__())
+        if self._hash_cache is None:
+            self._hash_cache = hash(self.__repr__())
+
+        return self._hash_cache
 
 
 @dataclass
@@ -242,6 +243,12 @@ class Not(Formula):
 
     def get_formula(self) -> Formula:
         return self.formula
+
+    def __hash__(self):
+        if self._hash_cache is None:
+            self._hash_cache = hash(self.__repr__())
+
+        return self._hash_cache
 
 
 class Theory:

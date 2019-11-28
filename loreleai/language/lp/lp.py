@@ -227,7 +227,24 @@ class Clause(Formula):
         return "{} :- {}".format(self._head, ','.join([str(x) for x in self._body]))
 
     def __hash__(self):
-        return hash(self.__repr__())
+        if self._hash_cache is None:
+            var_map = {}
+            for var in self._head.get_variables():
+                if var not in var_map:
+                    var_map[var] = len(var_map)
+
+            for atm in self._body:
+                for v in atm.get_variables():
+                    if v not in var_map:
+                        var_map[v] = len(var_map)
+
+            head_rep = f"{self._head.get_predicate().get_name()}({','.join([str(var_map[x] for x in self.get_variables())])})"
+            bodies = [f"{x.get_predicate().get_name()}({','.join([str(var_map[t]) if t in var_map else str(t) for t in x.get_terms()])})" for x in self._body]
+            bodies = ','.join(bodies)
+
+            self._hash_cache = hash(f"{head_rep} :- {bodies}")
+
+        return self._hash_cache #hash(self.__repr__())
 
 
 class ClausalTheory(Theory):
