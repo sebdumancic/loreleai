@@ -7,6 +7,7 @@ from itertools import combinations, product
 from typing import List, Dict, Set, Tuple, Union, Iterator, Sequence
 
 import networkx as nx
+import pygraphviz as pgv
 
 from loreleai.language.commons import _create_term_signatures
 from ..commons import Atom, Formula, Term, Predicate, Variable, Constant, Not, Theory
@@ -248,6 +249,9 @@ class ClausalTheory(Theory):
     def get_formulas(self) -> Sequence[Clause]:
         return self._formulas
 
+    def get_number_of_predicates(self):
+        return reduce((lambda x, y: x.union(y)), [x.get_predicates().union({x.get_head().get_predicate()}) for x in self._formulas])
+
     def unfold(self):
         """
         Unfolds the theory
@@ -299,6 +303,40 @@ class ClausalTheory(Theory):
             clauses_to_exclude = clauses_to_exclude.union(excls)
 
         return ClausalTheory(new_set_of_formulas)
+
+    def visualize(self, filename: str, only_numbers=False):
+        predicates_in_bodies_only = set()  # names are the predicate names
+        predicates_in_heads = set() # names are clauses
+
+        for cl in self._formulas:
+            predicates_in_heads.add(cl.get_head().get_predicate())
+            predicates_in_bodies_only = predicates_in_bodies_only.union([x.get_predicate() for x in cl.get_atoms()])
+
+        predicates_in_bodies_only = [x for x in predicates_in_bodies_only if x not in predicates_in_heads]
+
+        graph = pgv.AGraph(directed=True)
+        cl_to_node_name = {}
+
+        for p in predicates_in_bodies_only:
+            cl_to_node_name[p] = len(cl_to_node_name) if only_numbers else f"{p.get_name()}/{p.get_arity()}"
+            graph.add_node(cl_to_node_name[p], color='blue')
+
+        for cl in self._formulas:
+            ind = len(cl_to_node_name)
+            cl_to_node_name[cl] = ind if only_numbers else str(cl)
+            cl_to_node_name[cl.get_head().get_predicate()] = ind if only_numbers else str(cl)
+            graph.add_node(cl_to_node_name[cl], clause=cl, color='black' if ('latent' in cl.get_head().get_predicate().get_name() or "_" in cl.get_head().get_predicate().get_name()) else 'red')
+
+        for cl in self._formulas:
+            body_p = [x.get_predicate() for x in cl.get_atoms()]
+
+            for p in body_p:
+                graph.add_edge(cl_to_node_name[cl], cl_to_node_name[p])
+
+        graph.draw(filename, prog='dot')
+
+    def __str__(self):
+        return "\n".join([str(x) for x in self._formulas])
 
 
 def _convert_to_atom(string: str):
