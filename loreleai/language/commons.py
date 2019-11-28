@@ -163,7 +163,7 @@ class Predicate:
 class Formula:
 
     def __init__(self):
-        pass
+        self._properties = {}
 
     def substitute(self, term_map: Dict[Term, Term]):
         raise Exception("Not implemented yet!")
@@ -173,6 +173,12 @@ class Formula:
 
     def get_terms(self):
         raise Exception("Not implemented yet!")
+
+    def add_property(self, property_name: str, value):
+        self._properties[property_name] = value
+
+    def get_property(self, property_name: str):
+        return self._properties.get(property_name, None)
 
     def __hash__(self):
         return hash(self.__repr__())
