@@ -24,7 +24,7 @@ class Restructor:
     """
 
     def __init__(self, max_literals: int, min_literals: int = 2, head_variable_selection: int = 1, max_arity: int = 2,
-                 minimise_redundancy=False, exact_redundancy=False, logl=logging.INFO):
+                 minimise_redundancy=False, exact_redundancy=False, exclude_alternatives=False, logl=logging.INFO):
         self.max_literals = max_literals
         self.min_literals = min_literals
         self.candidate_counter = 0
@@ -33,6 +33,10 @@ class Restructor:
         self.enumerated_bodies = {}
         self.minimise_redundancy = minimise_redundancy
         self.minimise_redundancy_absolute_count = exact_redundancy
+        self._candidate_exclusion = []
+        self.exclude_alternatives = exclude_alternatives
+        self.redundant_candidates = []
+        self.equals_zero = None
         logging.basicConfig(level=logl, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
     def _get_candidate_index(self):
@@ -69,6 +73,11 @@ class Restructor:
             for ind, var_cmb in enumerate(combinations(available_vars, max_arity)):
                 head_pred = Predicate(f'{head_name}_{ind + 1}', len(var_cmb), [x.get_type() for x in var_cmb])
                 clauses.append(Clause(Atom(head_pred, list(var_cmb)), literals))
+
+            # remember the alternatives, and add constraint that only one of these can be taken
+            # assumes that all candidates have unique heads
+            if self.exclude_alternatives and len(clauses) > 1:
+                self._candidate_exclusion.append([x.get_head().get_predicate().get_name() for x in clauses])
 
             return clauses
         else:
@@ -276,6 +285,22 @@ class Restructor:
 
         return dict([(k, v) for k, v in redundancy_counts.items() if len(v) > 1]), [k for k, v in cooccurrence_counts.items() if v > 1]
 
+    def _find_candidate_redundancies(self, candidates: Dict[Predicate, Set[Clause]]):
+        """
+            Finds all redundancies in refactoring candidates and adds them to the self._candidate_exclusion
+
+        """
+        if self.min_literals == self.max_literals:
+            pass
+        else:
+            all_predicates = candidates.keys()
+            for length in range(self.min_literals, self.max_literals):
+                for cmb in combinations(all_predicates, length):
+                    cands = reduce((lambda x, y: x.union(y)), [candidates[p] for p in cmb])
+                    cands = [x for x in combinations(cands, 2) if len(x[0].is_part_of(x[1])) and len(x[0]) != len(x[1])]
+                    self.redundant_candidates += [(x[0].get_head().get_predicate().get_name(), x[1].get_head().get_predicate().get_name()) for x in cands]
+
+
     def __create_var_map(self, model: cp_model.CpModel,
                          candidates: Set[Clause],
                          co_occurrences: Sequence[Sequence[str]],
@@ -300,6 +325,7 @@ class Restructor:
         aux_var_index = 1
 
         for cand in candidates:
+            # TODO: use entire clause as the variable key
             variable_map[cand.get_head().get_predicate().get_name()] = model.NewBoolVar(cand.get_head().get_predicate().get_name())
 
         for co in co_occurrences:
@@ -430,6 +456,31 @@ class Restructor:
                     all_with_pattern.append(b)
                 model.Add(sum(all_with_pattern) <= 1)
 
+    def __eliminate_candidate_alternatives(self, model: cp_model.CpModel,
+                                           variable_map: Dict[Union[str, Iterator[str]], cp_model.IntVar]):
+        """
+        Eliminates candidate alternatives:
+            when multiple clause have the same body, but different head variables
+            imposes the constaint that at most one of those can be selected
+
+
+        Args:
+            model (cp_model.CpModel): model
+            variable_map (Dict[Union[str, Iterator[str]], cp_model.IntVar]): mapping from clauses to cp_model.vars
+        """
+        for alt in self._candidate_exclusion:
+            model.Add(sum([variable_map[x] for x in alt]) <= 1)
+
+    def __eliminate_redundant_candidates(self, model: cp_model.CpModel,
+                                         variable_map: Dict[Union[str, Iterator[str]], cp_model.IntVar]):
+        """
+        Eliminates redundant candidates in the solution (imposes the same constraint __eliminate_candidate_alternatives)
+
+        """
+        for alt in self.redundant_candidates:
+            model.AddBoolOr([variable_map[x].Not() for x in alt])
+
+
     def __set_objective(self, model: cp_model.CpModel,
                         candidates: Set[Clause],
                         variable_map: Dict[Union[str, Iterator[str]], cp_model.IntVar],
@@ -440,6 +491,13 @@ class Restructor:
         vars_to_use = [variable_map[x] for x in vars_to_use]
 
         if self.minimise_redundancy:
+            # creating redudnancy indicator variables
+
+            if self.minimise_redundancy_absolute_count:
+                # if we are minimising the exact count, we need the zero var
+                self.equals_zero = model.NewBoolVar('equals_zero')
+                model.Add(self.equals_zero == 0)
+
             individual_redunds = []
             for encoding_level in redundancies:
                 for redundancy_pattern in redundancies[encoding_level]:
@@ -452,9 +510,11 @@ class Restructor:
                         all_with_pattern.append(b)
 
                     if self.minimise_redundancy_absolute_count:
-                        out_b = model.NewIntVar(0, len(all_with_pattern), f'aux_red_sum_{self._get_candidate_index()}')
-                        model.Add(sum(all_with_pattern) - 1 == out_b)  # -1 allows to use 1 of the potentially redundant clauses, if only 1 is used there is no redundancy
-                        individual_redunds.append(out_b)
+                        out_b = model.NewIntVar(-1, len(all_with_pattern), f'aux_red_sum_{self._get_candidate_index()}')
+                        model.Add((sum(all_with_pattern) - 1) == out_b)  # -1 allows to use 1 of the potentially redundant clauses, if only 1 is used there is no redundancy
+                        b_max = model.NewBoolVar(f'aux_redmax_{self._get_candidate_index()}')
+                        model.AddMaxEquality(b_max, [self.equals_zero, out_b])
+                        individual_redunds.append(b_max)
                     else:
                         out_b = model.NewBoolVar(f'aux_red_sum_{self._get_candidate_index()}')
                         model.Add(sum(all_with_pattern) <= 1).OnlyEnforceIf(out_b.Not())  # reasoning inverted because out_b=0 means no redundancy
@@ -492,6 +552,9 @@ class Restructor:
         model = cp_model.CpModel()
         variable_map = self.__create_var_map(model, candidates, cooccurrences, clause_dependencies)
         clause_levels, encoding_cls_vars = self.__impose_encoding_constraints(model, encodings, variable_map)
+
+        if self.exclude_alternatives:
+            self.__eliminate_candidate_alternatives(model, variable_map)
 
         if not self.minimise_redundancy:
             self.__eliminate_redundancy_in_solutions(model, redundancies, variable_map, encoding_cls_vars, clause_levels)
@@ -596,6 +659,7 @@ class Restructor:
             focus_clauses = [x for x in focus_clauses if len(x) >= self.min_literals]
 
             iteration_candidates = self._get_candidates(focus_clauses)
+            #self._find_candidate_redundancies(iteration_candidates)
             # save the current candidates to the global collection
             all_refactoring_candidates.update(iteration_candidates)
 
