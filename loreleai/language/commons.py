@@ -262,6 +262,9 @@ class Theory:
     def __len__(self):
         return len(self.get_formulas())
 
+    def num_literals(self):
+        return sum([len(x) for x in self._formulas])
+
 
 def _create_term_signatures(literals: List[Union[Atom, Not]]) -> Dict[Term, Dict[Tuple[Predicate], int]]:
     """
