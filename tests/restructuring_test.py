@@ -1,4 +1,6 @@
-from loreleai.language.lp import parse, Theory
+import os
+
+from loreleai.language.lp import parse, ClausalTheory
 from loreleai.learning.restructuring import Restructor
 
 
@@ -10,7 +12,7 @@ class RestructuringMethods:
                    "t3(X,Y) :- b(X,Z), d(X, Y), c(X)"]
 
         clauses = [parse(x) for x in clauses]
-        theory = Theory(clauses)
+        theory = ClausalTheory(clauses)
 
         restruct = Restructor(max_literals=2)
 
@@ -21,15 +23,14 @@ class RestructuringMethods:
         all_cands = set()
 
         for p in cands:
-            print(p, cands[p])
             all_cands = all_cands.union(cands[p])
 
-        assert len(all_cands) == 8
+        assert len(all_cands) == 7
 
     def simple_encoding_restructuring_space(self):
         clauses = ["t1(X,Y) :- a(X,Y), b(X,Y), c(X)"]
         clauses = [parse(x) for x in clauses]
-        theory = Theory(clauses)
+        theory = ClausalTheory(clauses)
 
         restruct = Restructor(max_literals=2)
         all_cands = restruct._get_candidates(theory)
@@ -44,9 +45,9 @@ class RestructuringMethods:
     def restructuring_encoding_theory(self):
         clauses = ["t1(X,Y) :- a(X,Y), b(X,Y), c(X)",
                    "t2(X,Y) :- a(X,Y), b(Y,Z), c(Z)",
-                   "t3(X,Y) :- b(X,Z), d(X, Y), c(X)"]
+                   "t3(X,Y) :- b(X,Z), d(X,Y), c(X)"]
         clauses = [parse(x) for x in clauses]
-        theory = Theory(clauses)
+        theory = ClausalTheory(clauses)
 
         restruct = Restructor(max_literals=2)
         all_cands = restruct._get_candidates(theory)
@@ -57,12 +58,11 @@ class RestructuringMethods:
         assert len(cands) == 3
 
         distinct_candidates = set()
+
         for p in all_cands:
             distinct_candidates = distinct_candidates.union(all_cands[p])
 
-        assert len(distinct_candidates) == 8
-
-        assert all([len(cands[x]) == 3 for x in cands])
+        assert len(distinct_candidates) == 7
 
     def restructuring_no_redundancy(self):
         clauses = ["t1(X,Y) :- a(X,Y), b(X,Y), c(X)",
@@ -70,7 +70,7 @@ class RestructuringMethods:
                    "t3(X,Y) :- b(X,Z), d(X,Y), c(X)"]
 
         clauses = [parse(x) for x in clauses]
-        theory = Theory(clauses)
+        theory = ClausalTheory(clauses)
 
         restruct = Restructor(max_literals=2)
         all_cands = restruct._get_candidates(theory)
@@ -86,7 +86,7 @@ class RestructuringMethods:
                    "t3(X,Y) :- a(X,Y), b(X,Y), d(X,Z), c(X)"]
 
         clauses = [parse(x) for x in clauses]
-        theory = Theory(clauses)
+        theory = ClausalTheory(clauses)
 
         restruct = Restructor(max_literals=2)
 
@@ -97,6 +97,14 @@ class RestructuringMethods:
 
         assert len(redunds) == 3
 
+    def restructuring_unfold(self):
+        theory_file = os.path.dirname(__file__) + "/../data/restructuring/robots_example.pl"
+        theory = ClausalTheory(read_from_file=theory_file)
+
+        unfolded_theory = theory.unfold()
+
+        assert len(unfolded_theory) == 170
+
 
 def test_restructuring():
     test = RestructuringMethods()
@@ -106,4 +114,5 @@ def test_restructuring():
     test.restructuring_encoding_theory()
     test.restructuring_no_redundancy()
     test.restructuring_redundancy()
+    test.restructuring_unfold()
 
