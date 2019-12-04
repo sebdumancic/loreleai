@@ -11,6 +11,7 @@ from loreleai.language.lp import Clause, Predicate, Atom, Term, ClausalTheory, a
 NUM_PREDICATES = 1
 NUM_LITERALS = 2
 
+
 class Restructor:
     """
     Implements the theory restructuring functionality
@@ -25,9 +26,9 @@ class Restructor:
                                     head_variable_selection = 2
     """
 
-    def __init__(self, max_literals: int, min_literals: int = 2, head_variable_selection: int = 1, max_arity: int = 2,
+    def __init__(self, max_literals: int, min_literals: int = 2, head_variable_selection: int = 2, max_arity: int = 2,
                  minimise_redundancy=False, exact_redundancy=False, exclude_alternatives=False,
-                 objective_type=NUM_PREDICATES, logl=logging.INFO):
+                 objective_type=NUM_PREDICATES, logl=logging.INFO, logfile=None):
         self.max_literals = max_literals
         self.min_literals = min_literals
         self._objective_type = objective_type
@@ -41,7 +42,10 @@ class Restructor:
         self.exclude_alternatives = exclude_alternatives
         self.redundant_candidates = []
         self.equals_zero = None
-        logging.basicConfig(level=logl, format='[%(asctime)s] [%(levelname)s] %(message)s')
+        if logfile:
+            logging.basicConfig(level=logl, filename=logfile, format='[%(asctime)s] [%(levelname)s] %(message)s')
+        else:
+            logging.basicConfig(level=logl, format='[%(asctime)s] [%(levelname)s] %(message)s')
 
     def _get_candidate_index(self):
         """
@@ -146,7 +150,7 @@ class Restructor:
             return set()
 
         focus_atom = atoms_to_cover[0]
-        # print(f'{prefix}| focusing on {focus_atom}')
+        # logging.debug(f'{prefix}| focusing on {focus_atom}')
 
         matching_clauses = atom_covering[focus_atom].keys()
         # print(f'{prefix}|  found matching clauses {matching_clauses}')
@@ -154,7 +158,7 @@ class Restructor:
 
         for cl in matching_clauses:
             for match in atom_covering[focus_atom][cl]:
-                # print(f'{prefix}|    processing clause {cl} with match {match}')
+                # logging.debug(f'{prefix}|    processing clause {cl} with match {match}')
                 atms, sbs = match  # subs: key - variables in cl, value -- variables to use as the substitutions (from )
                 new_atoms_to_cover = [x for x in atoms_to_cover if x not in atms and x != focus_atom]
                 new_atoms_covered = atoms_covered.union(atms)
@@ -172,9 +176,9 @@ class Restructor:
                 if any([x in variables_in_the_rest_of_the_body for x in kicked_out_variables]):
                     continue
                 else:
-                    # print(f'{prefix}|      atoms covered: {new_atoms_covered}; atoms to cover: {new_atoms_to_cover}')
-                    encoding_rest = self.__encode(new_atoms_to_cover, new_atoms_covered, atom_covering, target_clause_head_vars.union(retained_variables), prefix=prefix * 10)
-                    # print(f'{prefix}|      encodings of the rest: {encoding_rest}')
+                    # logging.debug(f'{prefix}|      atoms covered: {new_atoms_covered}; atoms to cover: {new_atoms_to_cover}')
+                    encoding_rest = self.__encode(new_atoms_to_cover, new_atoms_covered, atom_covering, target_clause_head_vars.union(retained_variables), prefix=prefix * 2)
+                    # logging.debug(f'{prefix}|      encodings of the rest: {encoding_rest}')
 
                     if len(encoding_rest) == 0 and len(new_atoms_to_cover) == 0:
                         encodings.add(frozenset({cl.get_head().substitute(sbs)}))
@@ -194,7 +198,7 @@ class Restructor:
             clause (Clause): a clause to encode
             candidates (Dict[Predicate, Set[Clause]): candidates to use to encode the provided clause
         """
-        logging.debug(f'\tencoding clause {clause}')
+        logging.warning(f'\tencoding clause {clause}')
 
         clause_predicates = clause.get_predicates()
         filtered_candidates = dict([(k, v) for (k, v) in candidates.items() if k in clause_predicates])
@@ -710,7 +714,7 @@ class Restructor:
 
             if logging.getLogger().getEffectiveLevel() in (logging.DEBUG, logging.ERROR, logging.WARN):
                 logging.info(f"\t\tfound {len(distinct_candidates)} candidates")
-                logging.debug(f"\t\t\t{' '.join([str(x) for x in distinct_candidates])}")
+                logging.warning(f"\t\t\t{' '.join([str(x) for x in distinct_candidates])}")
 
             iteration_formulas = {}
 
