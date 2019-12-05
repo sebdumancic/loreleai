@@ -198,7 +198,7 @@ class Atom(Formula):
         self.arg_signature = []
 
     def substitute(self, term_map: Dict[Term, Term]):
-        return Atom(self.predicate, [term_map[x] if x in term_map else x for x in self.arguments])
+        return global_context.atom(self.predicate, [term_map[x] if x in term_map else x for x in self.arguments])
 
     def get_predicate(self) -> Predicate:
         return self.predicate
@@ -313,3 +313,62 @@ def _are_two_set_of_literals_identical(clause1: List[Atom], clause2: List[Atom])
         for v in l.get_terms():
             terms.add(v)
     return len(matches) == len(terms)
+
+
+class Context:
+
+    def __init__(self):
+        self._predicates = {}       # name/arity -> Predicate
+        self._variables = {}        # domain -> {name -> Variable}
+        self._constants = {}        # domain -> {name -> Constant}
+        self._atoms = {}            # Predicate -> { tuple of terms -> Atom}
+        self._domains = {'thing': Type('thing')}   # name -> Type
+
+    def _predicate_sig(self, name, arity):
+        return f"{name}/{arity}"
+
+    def predicate(self, name, arity, domains=()) -> Predicate:
+        if len(domains) == 0:
+            domains = [self._domains['thing']]*arity
+
+        if not self._predicate_sig(name, arity) is self._predicates:
+            self._predicates[self._predicate_sig(name, arity)] = Predicate(name, arity, domains)
+
+        return self._predicates[self._predicate_sig(name, arity)]
+
+    def variable(self, name, domain=None) -> Variable:
+        if domain is None:
+            domain = 'thing'
+
+        if domain not in self._variables:
+            self._variables[domain] = {}
+
+        if name not in self._variables[domain]:
+            self._variables[domain][name] = Variable(name, sym_type=domain)
+
+        return self._variables[domain][name]
+
+    def constant(self, name, domain=None) -> Constant:
+        if domain is None:
+            domain = 'thing'
+
+        if domain not in self._constants:
+            self._constants[domain] = {}
+
+        if name not in self._constants[domain]:
+            self._constants[domain][name] = Constant(name, domain)
+
+        return self._constants[domain][name]
+
+    def atom(self, predicate: Predicate, arguments: List[Term]) -> Atom:
+        if predicate not in self._atoms:
+            self._atoms[predicate] = {}
+
+        if tuple(arguments) not in self._atoms[predicate]:
+            self._atoms[predicate][tuple(arguments)] = Atom(predicate, arguments)
+
+        return self._atoms[predicate][tuple(arguments)]
+
+
+global_context = Context()
+

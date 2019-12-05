@@ -9,8 +9,7 @@ from typing import List, Dict, Set, Tuple, Union, Iterator, Sequence
 import networkx as nx
 import pygraphviz as pgv
 
-from loreleai.language.commons import _create_term_signatures
-from ..commons import Atom, Formula, Term, Predicate, Variable, Constant, Not, Theory
+from ..commons import Atom, Formula, Term, Predicate, Variable, Not, Theory, _create_term_signatures, global_context
 
 
 @dataclass
@@ -167,7 +166,7 @@ class Clause(Formula):
 
             existing_var_names = [x.get_name() for x in self.get_variables()]
             remaining_var_subs = zip(remaining_vars, [x for x in string.ascii_uppercase if x not in existing_var_names and x not in other_var_names_used])
-            remaining_var_subs = dict([(x, Variable(n, x.get_type())) for x, n in remaining_var_subs])
+            remaining_var_subs = dict([(x, global_context.variable(n, x.get_type())) for x, n in remaining_var_subs])
 
             vars_subs = dict(zip(head_vars, atm.get_variables()))
 
@@ -258,7 +257,7 @@ class ClausalTheory(Theory):
             inf = open(read_from_file)
 
             for line in inf.readlines():
-                if len(line) > 3 and not line.startswith('#') and not line.startswith('//'):
+                if len(line) > 3 and not line.startswith('#') and not line.startswith('%') and not line.startswith('//') and not line.startswith('true.'):
                     formulas.append(parse(line.strip().replace('.', '')))
 
         super(ClausalTheory, self).__init__(formulas)
@@ -360,10 +359,11 @@ def _convert_to_atom(string: str):
     pred, args = string.strip().replace(')', '').split('(')
     args = args.split(',')
 
-    pred = Predicate(pred, len(args))
-    args = [Constant(x) if x.islower() else Variable(x) for x in args]
+    pred = global_context.predicate(pred, len(args))  # Predicate(pred, len(args))
+    # args = [Constant(x) if x.islower() else Variable(x) for x in args]
+    args = [global_context.constant(x) if x.islower() else global_context.variable(x) for x in args]
 
-    return Atom(pred, args)
+    return global_context.atom(pred, args)
 
 
 def parse(string: str):
