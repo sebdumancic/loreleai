@@ -1,11 +1,12 @@
 import logging
+import sys
 from functools import reduce
 from itertools import combinations
 from typing import Set, Dict, List, Tuple, Iterator, Union, Sequence
 
 from ortools.sat.python import cp_model
 
-from loreleai.language.commons import _are_two_set_of_literals_identical
+from loreleai.language.commons import _are_two_set_of_literals_identical, global_context
 from loreleai.language.lp import Clause, Predicate, Atom, Term, ClausalTheory, are_variables_connected, Variable
 
 NUM_PREDICATES = 1
@@ -28,11 +29,11 @@ class Restructor:
 
     def __init__(self, max_literals: int, min_literals: int = 2, head_variable_selection: int = 2, max_arity: int = 2,
                  minimise_redundancy=False, exact_redundancy=False, exclude_alternatives=False,
-                 objective_type=NUM_PREDICATES, logl=logging.INFO, logfile=None):
+                 objective_type=NUM_PREDICATES, logl=logging.INFO, logfile: str = None, logger=None):
         self.max_literals = max_literals
         self.min_literals = min_literals
         self._objective_type = objective_type
-        self.candidate_counter = 0
+        self.aux_candidate_counter = 0
         self.head_variable_selection_strategy = head_variable_selection
         self.max_arity = max_arity
         self.enumerated_bodies = {}
@@ -41,11 +42,25 @@ class Restructor:
         self._candidate_exclusion = []
         self.exclude_alternatives = exclude_alternatives
         self.redundant_candidates = []
+        self.count_candidates = 0
         self.equals_zero = None
-        if logfile:
-            logging.basicConfig(level=logl, filename=logfile, format='[%(asctime)s] [%(levelname)s] %(message)s')
+        self.log_level = logl
+
+        # logging setup
+        self._logger = logger if logger else logging.getLogger(logfile if logfile else '')
+
+        if logfile is not None:
+            log_file = logging.FileHandler(logfile)
+            log_file.setLevel(logl)
+            log_file.setFormatter(logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s'))
+            self._logger.addHandler(log_file)
         else:
-            logging.basicConfig(level=logl, format='[%(asctime)s] [%(levelname)s] %(message)s')
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setLevel(logl)
+            console_handler.setFormatter(logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s'))
+            self._logger.addHandler(console_handler)
+
+        self._logger.setLevel(logl)
 
     def _get_candidate_index(self):
         """
@@ -54,8 +69,8 @@ class Restructor:
         Returns:
             integer
         """
-        self.candidate_counter += 1
-        return self.candidate_counter
+        self.aux_candidate_counter += 1
+        return self.aux_candidate_counter
 
     def __create_latent_clause(self, literals: List[Atom], variable_strategy: int = 1, max_arity: int = 2) -> List[Clause]:
         if not are_variables_connected(literals):
@@ -72,15 +87,21 @@ class Restructor:
 
         if variable_strategy == 1 or len(available_vars) == max_arity:
             # take all variables or number of variables is equal to max arity
-            head_pred = Predicate(head_name, len(available_vars), [x.get_type() for x in available_vars])
-            return [Clause(Atom(head_pred, available_vars), literals)]
+            head_pred = global_context.predicate(head_name, len(available_vars), [x.get_type() for x in available_vars])
+            # Predicate(head_name, len(available_vars), [x.get_type() for x in available_vars])
+            self.count_candidates += 1
+            atom = global_context.atom(head_pred, available_vars)  # Atom(head_pred, available_vars)
+            return [Clause(atom, literals)]
         elif variable_strategy == 2:
             # need to select a subset
             clauses = []
 
             for ind, var_cmb in enumerate(combinations(available_vars, max_arity)):
-                head_pred = Predicate(f'{head_name}_{ind + 1}', len(var_cmb), [x.get_type() for x in var_cmb])
-                clauses.append(Clause(Atom(head_pred, list(var_cmb)), literals))
+                # head_pred = Predicate(f'{head_name}_{ind + 1}', len(var_cmb), [x.get_type() for x in var_cmb])
+                head_pred = global_context.predicate(f'{head_name}_{ind + 1}', len(var_cmb), [x.get_type() for x in var_cmb])
+                self.count_candidates += 1
+                atom = global_context.atom(head_pred, list(var_cmb))  # Atom(head_pred, list(var_cmb))
+                clauses.append(Clause(atom, literals))
 
             # remember the alternatives, and add constraint that only one of these can be taken
             # assumes that all candidates have unique heads
@@ -104,8 +125,7 @@ class Restructor:
 
                     self.enumerated_bodies[predicate_sig].add(tuple(cmb))
 
-                    clauses = self.__create_latent_clause(list(cmb), self.head_variable_selection_strategy,
-                                                          self.max_arity)
+                    clauses = self.__create_latent_clause(list(cmb), self.head_variable_selection_strategy, self.max_arity)
                     for cl in clauses:
                         for p in predicate_sig:
                             if p not in accumulator:
@@ -126,7 +146,7 @@ class Restructor:
                 -- key: predicate
                 -- value: all clauses having that predicate in the body
         """
-        logging.info("Enumerating candidates...")
+        self._logger.info("Enumerating candidates...")
 
         return reduce(self.__process_candidates,
                       clauses.get_formulas() if isinstance(clauses, ClausalTheory) else clauses,
@@ -150,7 +170,7 @@ class Restructor:
             return set()
 
         focus_atom = atoms_to_cover[0]
-        # logging.debug(f'{prefix}| focusing on {focus_atom}')
+        # self._logger.debug(f'{prefix}| focusing on {focus_atom}')
 
         matching_clauses = atom_covering[focus_atom].keys()
         # print(f'{prefix}|  found matching clauses {matching_clauses}')
@@ -158,7 +178,7 @@ class Restructor:
 
         for cl in matching_clauses:
             for match in atom_covering[focus_atom][cl]:
-                # logging.debug(f'{prefix}|    processing clause {cl} with match {match}')
+                # self._logger..debug(f'{prefix}|    processing clause {cl} with match {match}')
                 atms, sbs = match  # subs: key - variables in cl, value -- variables to use as the substitutions (from )
                 new_atoms_to_cover = [x for x in atoms_to_cover if x not in atms and x != focus_atom]
                 new_atoms_covered = atoms_covered.union(atms)
@@ -176,9 +196,9 @@ class Restructor:
                 if any([x in variables_in_the_rest_of_the_body for x in kicked_out_variables]):
                     continue
                 else:
-                    # logging.debug(f'{prefix}|      atoms covered: {new_atoms_covered}; atoms to cover: {new_atoms_to_cover}')
+                    # self._logger.debug(f'{prefix}|      atoms covered: {new_atoms_covered}; atoms to cover: {new_atoms_to_cover}')
                     encoding_rest = self.__encode(new_atoms_to_cover, new_atoms_covered, atom_covering, target_clause_head_vars.union(retained_variables), prefix=prefix * 2)
-                    # logging.debug(f'{prefix}|      encodings of the rest: {encoding_rest}')
+                    # self._logger.debug(f'{prefix}|      encodings of the rest: {encoding_rest}')
 
                     if len(encoding_rest) == 0 and len(new_atoms_to_cover) == 0:
                         encodings.add(frozenset({cl.get_head().substitute(sbs)}))
@@ -198,7 +218,7 @@ class Restructor:
             clause (Clause): a clause to encode
             candidates (Dict[Predicate, Set[Clause]): candidates to use to encode the provided clause
         """
-        logging.warning(f'\tencoding clause {clause}')
+        self._logger.warning(f'\tencoding clause {clause}')
 
         clause_predicates = clause.get_predicates()
         filtered_candidates = dict([(k, v) for (k, v) in candidates.items() if k in clause_predicates])
@@ -239,7 +259,7 @@ class Restructor:
             candidates (Dict[Predicate, Set[Clause]]): clauses to use for encoding the theory
 
         """
-        logging.info(f'Encoding theory...')
+        self._logger.info(f'Encoding theory...')
         return dict([(x, self._encode_clause(x, candidates, originating_clause if originating_clause else x)) for x in (theory.get_formulas() if isinstance(theory, ClausalTheory) else theory)])
 
     def _find_redundancies(self, encoded_clauses: Dict[Clause, Sequence[Clause]]) -> Tuple[Dict[Sequence[str], Sequence[Clause]], Sequence[Sequence[str]]]:
@@ -249,7 +269,7 @@ class Restructor:
         Args:
             encoded_clauses (Dict[Clause, Set[Set[Atom]]]): encoded clauses
         """
-        logging.info(f'Finding redundancies...')
+        self._logger.info(f'Finding redundancies...')
 
         redundancy_counts = {}
         cooccurrence_counts = {}
@@ -547,7 +567,7 @@ class Restructor:
                     all_weighted_clauses.append(sub_component)
 
             # lengths of selected candidates
-            candidate_lengths = [(x.get_head().get_predicate().get_name(), len(x)) for x in candidates]
+            candidate_lengths = [(x.get_head().get_predicate().get_name(), len(x) + 1) for x in candidates]
             candidate_lengths = [variable_map[k]*v for k, v in candidate_lengths]
 
             model.Minimize(reduce((lambda x, y: x + y), all_weighted_clauses + candidate_lengths))
@@ -561,7 +581,8 @@ class Restructor:
                                  cooccurrences: Sequence[Sequence[str]],
                                  clause_dependencies: Dict[str, Sequence[str]],
                                  max_predicates,
-                                 num_threads):
+                                 num_threads,
+                                 max_time_s):
         """
         Maps the refactoring problem to CP-SAT and solves it
 
@@ -579,7 +600,7 @@ class Restructor:
 
         """
 
-        logging.info(f'Mapping to CP and solving')
+        self._logger.info(f'Mapping to CP and solving')
 
         model = cp_model.CpModel()
         variable_map = self.__create_var_map(model, candidates, cooccurrences, clause_dependencies)
@@ -598,10 +619,13 @@ class Restructor:
 
         solver = cp_model.CpSolver()
         solver.parameters.num_search_workers = num_threads
-        solution_callback = VarArraySolutionPrinter([variable_map[x.get_head().get_predicate().get_name()] for x in candidates])
-        logging.info("Started solving")
+        if max_time_s:
+            solver.parameters.max_time_in_seconds = max_time_s
+
+        solution_callback = VarArraySolutionPrinter([variable_map[x.get_head().get_predicate().get_name()] for x in candidates], self._logger)
+        self._logger.info("Started solving")
         status = solver.SolveWithSolutionCallback(model, solution_callback)  # solver.Solve(model)
-        logging.info(f"Solving done; status: {status}")
+        self._logger.info(f"Solving done; status: {status}")
 
         if status in (cp_model.OPTIMAL, cp_model.FEASIBLE, cp_model.UNKNOWN):
             selected_clauses = set([k for k, v in variable_map.items() if isinstance(k, str) and solver.Value(v) == 1])
@@ -629,7 +653,7 @@ class Restructor:
             refactorized theory
 
         """
-        logging.basicConfig(level=logging.CRITICAL)
+        self._logger.setLevel(logging.CRITICAL)
         final_theory = list(reduce((lambda x, y: x.union(y)), [x for x in refactoring_predicates.values()]))
 
         for cl in clauses.get_formulas():
@@ -656,9 +680,11 @@ class Restructor:
 
             final_theory += tmp_frm
 
+        self._logger.setLevel(self.log_level)
+
         return ClausalTheory(final_theory)
 
-    def restructure(self, clauses: ClausalTheory, max_layers=None, max_predicate=None, num_threads=1):
+    def restructure(self, clauses: ClausalTheory, max_layers=None, max_predicate=None, num_threads=1, max_time_s=None):
         """
         Starts the restructuring process
 
@@ -668,7 +694,8 @@ class Restructor:
         Return:
             a new restructured theory
         """
-        self.candidate_counter = 0
+        self.aux_candidate_counter = 0
+        self.count_candidates = 0
 
         # 4 -- optimal 2 -- feasible  0 -- unknown  3 -- infeasiable
         # print(cp_model.OPTIMAL, cp_model.FEASIBLE, cp_model.UNKNOWN, cp_model.INFEASIBLE)
@@ -686,7 +713,7 @@ class Restructor:
         iteration_counter = 0
 
         while something_to_refactor:
-            logging.info(f"\tStarting iteration: {iteration_counter}")
+            self._logger.info(f"\tStarting iteration: {iteration_counter}")
             # collect clauses to focus on
             if iteration_counter == 0:
                 focus_clauses = list(encodings_space.keys())
@@ -700,7 +727,6 @@ class Restructor:
             # save the current candidates to the global collection
             all_refactoring_candidates.update(iteration_candidates)
 
-            distinct_candidates = set()
             if iteration_counter > 0:
                 for p in iteration_candidates:
                     for cl in iteration_candidates[p]:
@@ -709,12 +735,7 @@ class Restructor:
                         if head_p not in clause_dependencies:
                             clause_dependencies[head_p] = dep_ps
 
-                    if logging.getLogger().getEffectiveLevel() in (logging.DEBUG, logging.ERROR, logging.WARN):
-                        distinct_candidates = distinct_candidates.union(iteration_candidates[p])
-
-            if logging.getLogger().getEffectiveLevel() in (logging.DEBUG, logging.ERROR, logging.WARN):
-                logging.info(f"\t\tfound {len(distinct_candidates)} candidates")
-                logging.warning(f"\t\t\t{' '.join([str(x) for x in distinct_candidates])}")
+            self._logger.info(f"\t\tfound {self.count_candidates} candidates")
 
             iteration_formulas = {}
 
@@ -751,9 +772,11 @@ class Restructor:
         for p in all_refactoring_candidates:
             distinct_candidates = distinct_candidates.union(all_refactoring_candidates[p])
 
-        logging.info(f"Found {len(distinct_candidates)} candidates in total")
+        self._logger.info(f"Found {self.count_candidates} candidates in total")
 
-        selected_clauses, refactoring_steps = self._map_to_solver_and_solve(distinct_candidates, encodings_space, all_redundancies, all_cooccurences, clause_dependencies, max_predicate, num_threads)
+        selected_clauses, refactoring_steps = self._map_to_solver_and_solve(distinct_candidates, encodings_space,
+                                                                            all_redundancies, all_cooccurences, clause_dependencies,
+                                                                            max_predicate, num_threads, max_time_s)
 
         # create_clause_index
         cl_ind = {}
@@ -772,14 +795,15 @@ class Restructor:
 class VarArraySolutionPrinter(cp_model.CpSolverSolutionCallback):
     """Print intermediate solutions."""
 
-    def __init__(self, variables):
+    def __init__(self, variables, logger):
         cp_model.CpSolverSolutionCallback.__init__(self)
         self.__variables = variables
         self.__solution_count = 0
+        self._logger = logger
 
     def on_solution_callback(self):
         self.__solution_count += 1
-        logging.info(f"\tIteration {self.__solution_count}: objective {self.ObjectiveValue()}, selected {sum([1 for x in self.__variables if self.Value(x) == 1])}")
+        self._logger.info(f"\tIteration {self.__solution_count}: objective {self.ObjectiveValue()}, selected {sum([1 for x in self.__variables if self.Value(x) == 1])}")
 
     def solution_count(self):
         return self.__solution_count
