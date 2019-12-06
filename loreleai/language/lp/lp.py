@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import string
 from dataclasses import dataclass
 from functools import reduce
 from itertools import combinations, product
@@ -42,7 +41,7 @@ class Clause(Formula):
             Return:
                 new clause with the replaced literals
         """
-        Clause(self._head.substitute(term_map), list(map(lambda x: x.substitute(term_map), self._body)))
+        return Clause(self._head.substitute(term_map), list(map(lambda x: x.substitute(term_map), self._body)))
 
     def get_predicates(self) -> Set[Predicate]:
         """
@@ -159,52 +158,49 @@ class Clause(Formula):
         Returns:
             unfolded clause [Clause]
         """
-        def _get_variable_map_unfolding(atm: Atom, clause: Clause, other_var_names_used=()):
-            remaining_vars = clause.get_variables()
-            head_vars = clause.get_head().get_variables()
-            remaining_vars = [x for x in remaining_vars if x not in head_vars]
-
-            existing_var_names = [x.get_name() for x in self.get_variables()]
-            remaining_var_subs = zip(remaining_vars, [x for x in string.ascii_uppercase if x not in existing_var_names and x not in other_var_names_used])
-            remaining_var_subs = dict([(x, global_context.variable(n, x.get_type())) for x, n in remaining_var_subs])
-
-            vars_subs = dict(zip(head_vars, atm.get_variables()))
-
-            # need them separately because there can be variable overlap, so the remaining vars should be replaced first
-            return vars_subs, remaining_var_subs
-
-        def _substitute_vars_in_atoms(atms: Iterator[Atom], head_vars: Dict[Variable, Variable], remaining_vars: Dict[Variable, Variable]):
-            atms = [x.substitute(remaining_vars) for x in atms]
-            return [x.substitute(head_vars) for x in atms]
 
         if isinstance(clauses, Clause):
             clauses = [clauses]
 
         _new_body_atoms = []
-        _new_var_names_used_so_far = set()
+        _forbidden_var_names = [x.get_name() for x in self.get_variables()]
 
-        for atm in self._body:
+        for atm_ind, atm in enumerate(self._body):
             matching_clauses = [x for x in clauses if x.get_head().get_predicate() == atm.get_predicate()]
+
+            # rename variables in all matching clauses
+            renamed_clauses = []
+            for cl_ind, cl in enumerate(matching_clauses):
+                var_map = {}
+
+                for v in cl.get_variables():
+                    alternative_name = f'{v.get_name()}{atm_ind}_{cl_ind}'
+                    cnt = 1
+
+                    # if the same name appears in the rest of the clause; happens with recursive unfolding
+                    if alternative_name in _forbidden_var_names:
+                        alternative_name = alternative_name + f"-{cnt}"
+                        while alternative_name in _forbidden_var_names:
+                            alternative_name = alternative_name.split('-')[0]
+                            cnt += 1
+                            alternative_name = alternative_name + f"-{cnt}"
+
+                    var_map[v] = global_context.variable(alternative_name, v.get_type())
+
+                renamed_clauses.append(cl.substitute(var_map))
+
+            matching_clauses = renamed_clauses
 
             if len(matching_clauses):
                 candidate_atoms = []
 
                 for mcl in matching_clauses:
-                    var_subs_head, var_subs_body = _get_variable_map_unfolding(atm, mcl, _new_var_names_used_so_far)
-
-                    # remember which auxiliary var names were used so far
-                    var_names_used_here = [v.get_name() for k, v in var_subs_body.items() if
-                                           k not in mcl.get_head().get_variables()]
-                    _new_var_names_used_so_far = _new_var_names_used_so_far.union(var_names_used_here)
-                    candidate_atoms.append(_substitute_vars_in_atoms(mcl.get_atoms(), var_subs_head, var_subs_body))
+                    var_map_matching_clause = dict(zip(mcl.get_head().get_variables(), atm.get_variables()))
+                    candidate_atoms.append([x.substitute(var_map_matching_clause) for x in mcl.get_atoms()])
 
                 _new_body_atoms.append(candidate_atoms)
             else:
                 _new_body_atoms.append([[atm]])
-
-        # clauses = []
-        #
-        # for itm in product(*_new_body_atoms):
 
         return [Clause(self._head, reduce(lambda u, v: u + v, x)) for x in product(*_new_body_atoms)]
 
