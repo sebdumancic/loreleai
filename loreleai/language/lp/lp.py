@@ -26,6 +26,7 @@ class Clause(Formula):
         self._head = head
         self._body = body
         self._terms = set()
+        self._repr_cache = None
 
         for lit in self._body:
             self._terms = self._terms.union(lit.get_terms())
@@ -219,7 +220,23 @@ class Clause(Formula):
         return len(self._body)
 
     def __repr__(self):
-        return "{} :- {}".format(self._head, ','.join([str(x) for x in self._body]))
+        if self._repr_cache is None:
+            head_vars = self._head.get_variables()
+            all_atoms = [x for x in self._body]
+            focus_vars = [head_vars[0]]
+            processed_vars = set()
+            atom_order = []
+
+            while len(all_atoms) > 0:
+                matching_atms = [x for x in all_atoms if any([y in focus_vars for y in x.get_variables()])]
+                matching_atms = sorted(matching_atms, key=lambda x: min([x.get_variables().index(y) if y in x.get_variables() else 5 for y in focus_vars]))
+                processed_vars = processed_vars.union(focus_vars)
+                atom_order += matching_atms
+                all_atoms = [x for x in all_atoms if x not in matching_atms]
+                focus_vars = reduce((lambda x, y: x + y), [x.get_variables() for x in matching_atms if x not in processed_vars])
+
+            self._repr_cache = "{} :- {}".format(self._head, ','.join([str(x) for x in atom_order]))
+        return self._repr_cache
 
     def __hash__(self):
         if self._hash_cache is None:
