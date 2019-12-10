@@ -328,7 +328,6 @@ class Restructor:
                     cands = [x for x in combinations(cands, 2) if len(x[0].is_part_of(x[1])) and len(x[0]) != len(x[1])]
                     self.redundant_candidates += [(x[0].get_head().get_predicate().get_name(), x[1].get_head().get_predicate().get_name()) for x in cands]
 
-
     def __create_var_map(self, model: cp_model.CpModel,
                          candidates: Set[Clause],
                          co_occurrences: Sequence[Sequence[str]],
@@ -359,7 +358,6 @@ class Restructor:
         for co in co_occurrences:
             variable_map[co] = model.NewBoolVar(f'aux{aux_var_index}')
             # create the equality relating the aux variable to a product of
-            # model.Add(variable_map[co] == reduce((lambda x, y: x * y), [variable_map[x] for x in co]))
             model.AddMultiplicationEquality(variable_map[co], [variable_map[x] for x in co])
 
             # increase the index for the next aux var created
@@ -372,9 +370,6 @@ class Restructor:
             model.AddBoolAnd([variable_map[c] for c in clause_dependencies[cl]]).OnlyEnforceIf(b)
             # selection of level+1 predicate implies selecting the predicates it depends on
             model.AddImplication(variable_map[cl], b)
-            # model.AddBoolAnd([variable_map[x] for x in clause_dependencies[cl]]).OnlyEnforceIf(variable_map[cl])
-            # for dcl in clause_dependencies[cl]:
-            #     model.Add(variable_map[cl] == 0).OnlyEnforceIf(variable_map[dcl].Not())
 
         return variable_map
 
@@ -388,9 +383,8 @@ class Restructor:
         for clind, cl in enumerate(encodings):
             encs = encodings[cl]
             encs = [x.get_formulas() for x in encs]   # each item is the encoding level, as list of formulas
-            #encs = [[x.get_predicate().get_name() for x in y.get_atoms()] for y in encs]
 
-            clause_level_selection_vars[cl] = [model.NewBoolVar(f'aux_level_{x+1}_{self._get_candidate_index()}') for x in range(len(encs))]
+            clause_level_selection_vars[cl] = [model.NewBoolVar(f'aux_level_{x+1}_{self._get_candidate_index()}') for x in range(len(encs) + 1)] # + 1 to get 'choose not refactoring'
             level_components = []
 
             # individual_encodings = []
@@ -420,11 +414,7 @@ class Restructor:
                     combs = [variable_map[x] for x in combs]
 
                     # ___ new encoding
-                    tmp_var = model.NewBoolVar(f'ind_enc_{clind}_{l_ind}_{eind}')
-                    # encoding with sum over variables
-                    # # TODO: is it faster to use the product of the variables and AddEquality?
-                    # model.Add(reduce((lambda x, y: x + y), plain_vars + combs) >= len(plain_vars + combs)).OnlyEnforceIf(tmp_var)
-                    # model.Add(reduce((lambda x, y: x + y), plain_vars + combs) < len(plain_vars + combs)).OnlyEnforceIf(tmp_var.Not())
+                    tmp_var = model.NewBoolVar(f'ind_enc_{clind}_{l_ind+1}_{eind}')
 
                     # encoding with And/Or
                     # encodes one possible refactoring and adds them all together in individual_encodings_at_current_level
@@ -435,18 +425,6 @@ class Restructor:
 
                     # add the var to the corresponding clause
                     encoding_clauses_to_vars[encs[l_ind][eind]] = tmp_var
-                    # -- individual_encodings.append(tmp_var)
-
-                # ENCODING WITH CURRENT LEVEL AND ABOVE
-                # # introduce a variable indicating that that the current encoding level is selected
-                # level_b = clause_level_selection_vars[cl][l_ind:]
-                # appropriate_level_selected = model.NewBoolVar(f'aux_level_{self._get_candidate_index()}')
-                # model.AddBoolOr(level_b).OnlyEnforceIf(appropriate_level_selected)
-                # model.AddBoolAnd([x.Not() for x in level_b]).OnlyEnforceIf(appropriate_level_selected.Not())
-                #
-                # #       if level selected, on of the encodings has to be selected as well
-                # model.AddBoolOr(individual_encodings_at_current_level).OnlyEnforceIf(appropriate_level_selected)
-                # model.AddBoolAnd([x.Not() for x in individual_encodings_at_current_level]).OnlyEnforceIf(appropriate_level_selected.Not())
 
                 # ENCODING WITH THE CURRENT LEVEL ONLY
                 # takes individual encodings at the current level and makes an OR of all of them
@@ -454,7 +432,7 @@ class Restructor:
                 model.AddBoolOr(individual_encodings_at_current_level).OnlyEnforceIf(encoding_exists_var)
 
                 # And(level, Or(and individual encodings)) enforce only in entire_level_component (indicates that something from that level should be selected)
-                level = clause_level_selection_vars[cl][l_ind]
+                level = clause_level_selection_vars[cl][l_ind+1] # l_ind = 0 is not refactoring
                 entire_level_component = model.NewBoolVar(f'aux_levcom_{self._get_candidate_index()}')
                 model.AddBoolAnd([level, encoding_exists_var]).OnlyEnforceIf(entire_level_component)
                 level_components.append(entire_level_component)
@@ -477,7 +455,8 @@ class Restructor:
             for redundancy_pattern in redundancies[level]:
                 all_with_pattern = []
                 for cl in redundancies[level][redundancy_pattern]:
-                    corresponding_level_var = encoding_level_vars[cl.get_property("parent")][level]
+                    # + 1 because level=0 is no refactoring
+                    corresponding_level_var = encoding_level_vars[cl.get_property("parent")][level + 1]
                     b = model.NewBoolVar(f'aux_red_{self._get_candidate_index()}')
                     model.AddBoolAnd([corresponding_level_var, encoded_clause_vars[cl]]).OnlyEnforceIf(b)
                     model.AddBoolOr([corresponding_level_var.Not(), encoded_clause_vars[cl].Not()]).OnlyEnforceIf(b.Not())
@@ -508,7 +487,6 @@ class Restructor:
         for alt in self.redundant_candidates:
             model.AddBoolOr([variable_map[x].Not() for x in alt])
 
-
     def __set_objective(self, model: cp_model.CpModel,
                         candidates: Set[Clause],
                         variable_map: Dict[Union[str, Iterator[str]], cp_model.IntVar],
@@ -521,7 +499,7 @@ class Restructor:
 
         if self._objective_type == NUM_PREDICATES:
             if self.minimise_redundancy:
-                # creating redudnancy indicator variables
+                # creating redundnancy indicator variables
 
                 if self.minimise_redundancy_absolute_count:
                     # if we are minimising the exact count, we need the zero var
@@ -533,7 +511,7 @@ class Restructor:
                     for redundancy_pattern in redundancies[encoding_level]:
                         all_with_pattern = []
                         for cl in redundancies[encoding_level][redundancy_pattern]:
-                            corresponding_level_var = encoding_level_vars[cl.get_property("parent")][encoding_level]
+                            corresponding_level_var = encoding_level_vars[cl.get_property("parent")][encoding_level+1] # +1 to account for 0 being no refactoring
                             b = model.NewBoolVar(f'aux_red_{self._get_candidate_index()}')
                             model.AddBoolAnd([corresponding_level_var, encoded_clause_vars[cl]]).OnlyEnforceIf(b)
                             model.AddBoolOr([corresponding_level_var.Not(), encoded_clause_vars[cl].Not()]).OnlyEnforceIf(b.Not())
@@ -559,12 +537,15 @@ class Restructor:
             # lengths of selected clauses
             for cl in encodings:
                 for ind, eth in enumerate(encodings[cl]):
-                    wcl = [(x, len(x)) for x in eth.get_formulas()]
+                    wcl = [(x, len(x) + 1) for x in eth.get_formulas()]  # + 1 to include the head predicate
                     sum_at_current_level = model.NewIntVar(0, sum([v for k, v in wcl]), f'aux_sum_{self._get_candidate_index()}')
                     model.Add(reduce((lambda x, y: x + y), [encoded_clause_vars[k]*v for k, v in wcl]) == sum_at_current_level)
                     sub_component = model.NewIntVar(0, sum([v for k, v in wcl]),  f'aux_comp_{self._get_candidate_index()}')
-                    model.AddProdEquality(sub_component, [sum_at_current_level, encoding_level_vars[cl][ind]])
+                    model.AddProdEquality(sub_component, [sum_at_current_level, encoding_level_vars[cl][ind+1]]) # +1 to account for 0 being no refactoring
                     all_weighted_clauses.append(sub_component)
+
+                # add no refactoring cost, encoding/refactoring level = 0
+                all_weighted_clauses.append(encoding_level_vars[cl][0]*(len(cl) + 1))
 
             # lengths of selected candidates
             candidate_lengths = [(x.get_head().get_predicate().get_name(), len(x) + 1) for x in candidates]
@@ -633,7 +614,7 @@ class Restructor:
             refactoring_steps_per_clause = {}
             for cl in cls_level_indicators:
                 tmp = [solver.Value(x) for x in cls_level_indicators[cl]]
-                refactoring_steps_per_clause[cl] = tmp.index(1) + 1
+                refactoring_steps_per_clause[cl] = tmp.index(1)  # + 1 - not needed because index  would mean 1 step of refactoring
             return selected_clauses, refactoring_steps_per_clause
         else:
             raise Exception('Could not find a satisfiable solution!')
