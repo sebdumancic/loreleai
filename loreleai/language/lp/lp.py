@@ -367,6 +367,9 @@ class ClausalTheory(Theory):
     def __str__(self):
         return "\n".join([str(x) for x in self._formulas])
 
+    def num_literals(self):
+        return sum([len(x)+1 for x in self._formulas])
+
 
 def _convert_to_atom(string: str):
     pred, args = string.strip().replace(')', '').split('(')
