@@ -278,7 +278,7 @@ class ClausalTheory(Theory):
     def get_formulas(self) -> Sequence[Clause]:
         return self._formulas
 
-    def get_number_of_predicates(self):
+    def get_predicates(self) -> Set[Predicate]:
         return reduce((lambda x, y: x.union(y)), [x.get_predicates().union({x.get_head().get_predicate()}) for x in self._formulas])
 
     def unfold(self):

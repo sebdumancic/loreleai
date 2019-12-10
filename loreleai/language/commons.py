@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Union, Sequence
+from typing import Dict, List, Tuple, Union, Sequence, Set
 
 
 class Term:
@@ -264,6 +264,9 @@ class Theory:
 
     def num_literals(self):
         return sum([len(x) for x in self._formulas])
+
+    def get_predicates(self) -> Set[Predicate]:
+        raise Exception('Not implemented yet!')
 
 
 def _create_term_signatures(literals: List[Union[Atom, Not]]) -> Dict[Term, Dict[Tuple[Predicate], int]]:
