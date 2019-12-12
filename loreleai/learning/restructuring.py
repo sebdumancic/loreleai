@@ -244,7 +244,7 @@ class Restructor:
                             atom_to_covering_clause_index[atm][cand].append(answer)
 
         encoding, used_clauses = self.__encode(clause.get_atoms(), set(), atom_to_covering_clause_index, set(clause.get_head().get_variables()))
-        encoding = [Clause(clause.get_head(), list(x)) for x in encoding]  # if refactoring does not reduce the length on th clause, reject it
+        encoding = [Clause(clause.get_head(), list(x)) for x in encoding if len(x) < len(clause)]  # if refactoring does not reduce the length on th clause, reject it
         for cl in encoding:
             cl.add_property("parent", originating_clause if originating_clause else clause)
 
