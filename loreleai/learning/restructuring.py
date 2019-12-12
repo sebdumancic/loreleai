@@ -37,6 +37,7 @@ class Restructor:
         self.head_variable_selection_strategy = head_variable_selection
         self.max_arity = max_arity
         self.enumerated_bodies = {}
+        self.candidate_usage_count = {}
         self.minimise_redundancy = minimise_redundancy
         self.minimise_redundancy_absolute_count = exact_redundancy
         self._candidate_exclusion = []
@@ -156,7 +157,7 @@ class Restructor:
                  atoms_covered: Set[Atom],
                  atom_covering: Dict[Atom, Dict[Clause, Set[Tuple[List[Atom], Dict[Term, Term]]]]],
                  target_clause_head_vars: Set[Variable],
-                 prefix=" ") -> Set[Set[Atom]]:
+                 prefix=" ") -> Tuple[Set[Set[Atom]], Set[Clause]]:
         """
         Encoding of a set of atoms
         :param atoms_to_cover:
@@ -167,12 +168,13 @@ class Restructor:
         """
 
         if len(atoms_to_cover) == 0:
-            return set()
+            return set(), set()
 
         focus_atom = atoms_to_cover[0]
         # self._logger.debug(f'{prefix}| focusing on {focus_atom}')
 
         matching_clauses = atom_covering[focus_atom].keys()
+        used_clauses = set()
         # print(f'{prefix}|  found matching clauses {matching_clauses}')
         encodings = set()
 
@@ -196,8 +198,10 @@ class Restructor:
                 if any([x in variables_in_the_rest_of_the_body for x in kicked_out_variables]):
                     continue
                 else:
+                    used_clauses.add(cl)
                     # self._logger.debug(f'{prefix}|      atoms covered: {new_atoms_covered}; atoms to cover: {new_atoms_to_cover}')
-                    encoding_rest = self.__encode(new_atoms_to_cover, new_atoms_covered, atom_covering, target_clause_head_vars.union(retained_variables), prefix=prefix * 2)
+                    encoding_rest, inner_used = self.__encode(new_atoms_to_cover, new_atoms_covered, atom_covering, target_clause_head_vars.union(retained_variables), prefix=prefix * 2)
+                    used_clauses = used_clauses.union(inner_used)
                     # self._logger.debug(f'{prefix}|      encodings of the rest: {encoding_rest}')
 
                     if len(encoding_rest) == 0 and len(new_atoms_to_cover) == 0:
@@ -206,7 +210,7 @@ class Restructor:
                         for enc_rest in encoding_rest:
                             encodings.add(enc_rest.union([cl.get_head().substitute(sbs)]))
 
-        return encodings
+        return encodings, used_clauses
 
     def _encode_clause(self, clause: Clause,
                        candidates: Dict[Predicate, Set[Clause]],
@@ -239,14 +243,27 @@ class Restructor:
                         if answer not in atom_to_covering_clause_index[atm][cand]:
                             atom_to_covering_clause_index[atm][cand].append(answer)
 
-        encoding = self.__encode(clause.get_atoms(), set(), atom_to_covering_clause_index, set(clause.get_head().get_variables()))
-        encoding = [Clause(clause.get_head(), list(x)) for x in encoding]
+        encoding, used_clauses = self.__encode(clause.get_atoms(), set(), atom_to_covering_clause_index, set(clause.get_head().get_variables()))
+        encoding = [Clause(clause.get_head(), list(x)) for x in encoding]  # if refactoring does not reduce the length on th clause, reject it
         for cl in encoding:
             cl.add_property("parent", originating_clause if originating_clause else clause)
+
+        # update candidate counts
+        for cl in used_clauses:
+            if cl not in self.candidate_usage_count:
+                self.candidate_usage_count[cl] = 0
+            self.candidate_usage_count[cl] += 1
         #encoding = map((lambda x: x.add_property("parent", originating_clause if originating_clause else clause)), encoding)
 
         #return self.__encode(clause.get_atoms(), set(), atom_to_covering_clause_index, set(clause.get_head().get_variables()))
         return list(encoding)
+
+    def _prune_candidate_set(self, candidates: Dict[Predicate, Set[Clause]]):
+        """
+        Prunes the set of candidates; removes all candidates for which
+            length(candidate) * usage(candidate) < length(candidate) + usage(candidate)
+        """
+        return dict([(k, set([x for x in v if len(v) * self.candidate_usage_count[v] > len(v) + self.candidate_usage_count[v]])) for k, v in candidates.items()])
 
     def _encode_theory(self, theory: Union[ClausalTheory, Sequence[Clause]],
                        candidates: Dict[Predicate, Set[Clause]],
@@ -665,7 +682,8 @@ class Restructor:
 
         return ClausalTheory(final_theory)
 
-    def restructure(self, clauses: ClausalTheory, max_layers=None, max_predicate=None, num_threads=1, max_time_s=None):
+    def restructure(self, clauses: ClausalTheory, max_layers=None, max_predicate=None, num_threads=1, max_time_s=None,
+                    prune_candidates=False):
         """
         Starts the restructuring process
 
@@ -694,6 +712,7 @@ class Restructor:
         iteration_counter = 0
 
         while something_to_refactor:
+            self.candidate_usage_count = {}
             self._logger.info(f"\tStarting iteration: {iteration_counter}")
             # collect clauses to focus on
             if iteration_counter == 0:
@@ -704,6 +723,8 @@ class Restructor:
             focus_clauses = [x for x in focus_clauses if len(x) >= self.min_literals]
 
             iteration_candidates = self._get_candidates(focus_clauses)
+            if prune_candidates:
+                iteration_candidates = self._prune_candidate_set(iteration_candidates)
             #self._find_candidate_redundancies(iteration_candidates)
             # save the current candidates to the global collection
             all_refactoring_candidates.update(iteration_candidates)
