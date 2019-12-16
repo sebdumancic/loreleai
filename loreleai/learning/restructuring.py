@@ -258,12 +258,18 @@ class Restructor:
         #return self.__encode(clause.get_atoms(), set(), atom_to_covering_clause_index, set(clause.get_head().get_variables()))
         return list(encoding)
 
-    def _prune_candidate_set(self, candidates: Dict[Predicate, Set[Clause]]):
+    def _prune_candidate_set(self, candidates: Dict[Predicate, Set[Clause]]) -> Tuple[Dict[Predicate, Set[Clause]], Set[Clause]]:
         """
         Prunes the set of candidates; removes all candidates for which
             length(candidate) * usage(candidate) < length(candidate) + usage(candidate)
+
+        Returns:
+            in set: candidates to keep
+            out set: pruned candidates
         """
-        return dict([(k, set([x for x in v if len(v) * self.candidate_usage_count[v] > len(v) + self.candidate_usage_count[v]])) for k, v in candidates.items()])
+
+        return dict([(k, set([x for x in v if len(x) * self.candidate_usage_count.get(x, 0) > len(x) + self.candidate_usage_count.get(x, 0)])) for k, v in candidates.items()]), \
+                reduce((lambda x, y: x.union(y)), [set([x for x in v if len(x) * self.candidate_usage_count.get(x, 0) <= len(x) + self.candidate_usage_count.get(x, 0)]) for k, v in candidates.items()], set())
 
     def _encode_theory(self, theory: Union[ClausalTheory, Sequence[Clause]],
                        candidates: Dict[Predicate, Set[Clause]],
@@ -565,7 +571,9 @@ class Restructor:
                 all_weighted_clauses.append(encoding_level_vars[cl][0]*(len(cl) + 1))
 
             # lengths of selected candidates
-            candidate_lengths = [(x.get_head().get_predicate().get_name(), len(x) + 1) for x in candidates]
+            # exclude 1-length candidates because they help with partial refactoring:
+            #                   the heads can simply be replaced by the body
+            candidate_lengths = [(x.get_head().get_predicate().get_name(), len(x) + 1) for x in candidates if len(x) > 1]
             candidate_lengths = [variable_map[k]*v for k, v in candidate_lengths]
 
             model.Minimize(reduce((lambda x, y: x + y), all_weighted_clauses + candidate_lengths))
@@ -608,7 +616,7 @@ class Restructor:
             self.__eliminate_candidate_alternatives(model, variable_map)
 
         if not self.minimise_redundancy and self._objective_type == NUM_PREDICATES:
-            # if we want to eliminat redundancy and we are minimizing the number of predicates
+            # if we want to eliminate redundancy and we are minimizing the number of predicates
             self.__eliminate_redundancy_in_solutions(model, redundancies, variable_map, encoded_cls_var, cls_level_indicators)
         self.__set_objective(model, candidates, variable_map, redundancies if self.minimise_redundancy else (), encoded_cls_var, cls_level_indicators, encodings)
 
@@ -695,8 +703,9 @@ class Restructor:
         """
         self.aux_candidate_counter = 0
         self.count_candidates = 0
+        candidatesPruned = set()
 
-        # 4 -- optimal 2 -- feasible  0 -- unknown  3 -- infeasiable
+        # 4 -- optimal 2 -- feasible  0 -- unknown  3 -- infeasible
         # print(cp_model.OPTIMAL, cp_model.FEASIBLE, cp_model.UNKNOWN, cp_model.INFEASIBLE)
 
         encodings_space: Dict[Clause, List[ClausalTheory]] = dict([(f, []) for f in clauses.get_formulas()])
@@ -723,11 +732,10 @@ class Restructor:
             focus_clauses = [x for x in focus_clauses if len(x) >= self.min_literals]
 
             iteration_candidates = self._get_candidates(focus_clauses)
-            if prune_candidates:
-                iteration_candidates = self._prune_candidate_set(iteration_candidates)
+
             #self._find_candidate_redundancies(iteration_candidates)
             # save the current candidates to the global collection
-            all_refactoring_candidates.update(iteration_candidates)
+            # all_refactoring_candidates.update(iteration_candidates)
 
             if iteration_counter > 0:
                 for p in iteration_candidates:
@@ -759,6 +767,42 @@ class Restructor:
                     else:
                         pass
 
+            # if pruning is required
+            # has to be done after the encoding as that is where the counts happen
+            if prune_candidates:
+                iteration_candidates, rejectedCandidates = self._prune_candidate_set(iteration_candidates)
+                rejectedPredicates = set(sorted([x.get_head().get_predicate() for x in rejectedCandidates], key=lambda x: str(x)))
+                false_exclusions = set()
+                for cl in encodings_space:
+                    if len(encodings_space[cl]) > iteration_counter:
+                        formulas_to_remove = encodings_space[cl][-1].get_formulas(rejectedPredicates)
+
+                        # if no refactoring is left after removing rejected predicates,
+                        #       retain the rejected predicates that were used
+                        if len(formulas_to_remove) == len(encodings_space[cl][-1]):
+                            used_preds = reduce((lambda x, y: x.union(y)), [x.get_predicates() for x in formulas_to_remove])
+                            false_exclusions = false_exclusions.union(rejectedPredicates.intersection(used_preds))
+
+                # add false rejections to the iterations candidates
+                matching_falsely_rejected_candidates = [x for x in rejectedCandidates if x.get_head().get_predicate() in false_exclusions]
+                for item in matching_falsely_rejected_candidates:
+                    for p in item.get_predicates():
+                        iteration_candidates[p].add(item)
+
+                rejectedPredicates = rejectedPredicates.difference(false_exclusions)
+                candidatesPruned = candidatesPruned.union(rejectedCandidates.difference(matching_falsely_rejected_candidates))
+                all_refactoring_candidates.update(iteration_candidates)
+
+                # clean the refactored theories
+                for cl in encodings_space:
+                    if len(encodings_space[cl]) > iteration_counter:
+                        encodings_space[cl][-1].remove_formulas_with_predicates(rejectedPredicates)
+
+                # clear the clause dependencies
+                for rej_can in rejectedPredicates:
+                    if rej_can.get_name() in clause_dependencies:
+                        del clause_dependencies[rej_can.get_name()]
+
             if self._objective_type == NUM_PREDICATES:
                 # detect all redundancies and co-occurences
                 tmp_redundancies, tmp_cooccurrences = self._find_redundancies(iteration_formulas)
@@ -774,7 +818,7 @@ class Restructor:
         for p in all_refactoring_candidates:
             distinct_candidates = distinct_candidates.union(all_refactoring_candidates[p])
 
-        self._logger.info(f"Found {self.count_candidates} candidates in total")
+        self._logger.info(f"Found {self.count_candidates} candidates in total; pruned {len(candidatesPruned)}")
 
         selected_clauses, refactoring_steps = self._map_to_solver_and_solve(distinct_candidates, encodings_space,
                                                                             all_redundancies, all_cooccurences, clause_dependencies,
