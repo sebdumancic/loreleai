@@ -803,6 +803,10 @@ class Restructor:
                     if rej_can.get_name() in clause_dependencies:
                         del clause_dependencies[rej_can.get_name()]
 
+                # clear alternatives
+                rejectedPredicates = set([x.get_name() for x in rejectedPredicates])
+                self._candidate_exclusion = [x for x in self._candidate_exclusion if not any([p in rejectedPredicates for p in x])]
+
             if self._objective_type == NUM_PREDICATES:
                 # detect all redundancies and co-occurences
                 tmp_redundancies, tmp_cooccurrences = self._find_redundancies(iteration_formulas)
