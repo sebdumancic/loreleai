@@ -175,6 +175,9 @@ class Formula:
     def get_terms(self):
         raise Exception("Not implemented yet!")
 
+    def get_predicates(self) -> Set[Predicate]:
+        raise Exception("Not implemented yet!")
+
     def add_property(self, property_name: str, value):
         self._properties[property_name] = value
 
@@ -202,6 +205,9 @@ class Atom(Formula):
 
     def get_predicate(self) -> Predicate:
         return self.predicate
+
+    def get_predicates(self) -> Set[Predicate]:
+        return {self.get_predicate()}
 
     def get_variables(self) -> List[Variable]:
         return [x for x in self.arguments if isinstance(x, Variable)]
@@ -244,6 +250,9 @@ class Not(Formula):
     def get_formula(self) -> Formula:
         return self.formula
 
+    def get_predicates(self) -> Set[Predicate]:
+        return self.formula.get_predicates()
+
     def __hash__(self):
         if self._hash_cache is None:
             self._hash_cache = hash(self.__repr__())
@@ -256,8 +265,11 @@ class Theory:
     def __init__(self, formulas: Sequence[Formula]):
         self._formulas = formulas
 
-    def get_formulas(self) -> Sequence[Formula]:
-        return self._formulas
+    def get_formulas(self, predicates: Set[Predicate] = None) -> Sequence[Formula]:
+        if predicates:
+            return [x for x in self._formulas if any([p for p in x.get_predicates()])]
+        else:
+            return self._formulas
 
     def __len__(self):
         return len(self.get_formulas())
