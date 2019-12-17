@@ -29,7 +29,8 @@ class Restructor:
 
     def __init__(self, max_literals: int, min_literals: int = 2, head_variable_selection: int = 2, max_arity: int = 2,
                  minimise_redundancy=False, exact_redundancy=False, exclude_alternatives=False,
-                 objective_type=NUM_PREDICATES, logl=logging.INFO, logfile: str = None, logger=None):
+                 objective_type=NUM_PREDICATES, exclude_redundant_cands=False,
+                 logl=logging.INFO, logfile: str = None, logger=None):
         self.max_literals = max_literals
         self.min_literals = min_literals
         self._objective_type = objective_type
@@ -42,6 +43,7 @@ class Restructor:
         self.minimise_redundancy_absolute_count = exact_redundancy
         self._candidate_exclusion = []
         self.exclude_alternatives = exclude_alternatives
+        self.exclude_redundant_candidates = exclude_redundant_cands
         self.redundant_candidates = []
         self.count_candidates = 0
         self.equals_zero = None
@@ -187,11 +189,11 @@ class Restructor:
 
                 # make sure that none of the variables that would be kicked out are needed in the rest of the body
                 retained_variables = set([sbs[x] for x in cl.get_head().get_variables()])
-                kicked_out_variables = reduce((lambda x, y: x + y), [x.get_variables() for x in atms])
+                kicked_out_variables = reduce((lambda x, y: x + y), [x.get_variables() for x in atms], [])
                 kicked_out_variables = [x for x in kicked_out_variables if x not in retained_variables]
 
                 if len(new_atoms_to_cover):
-                    variables_in_the_rest_of_the_body = set(reduce((lambda x, y: x + y), [x.get_variables() for x in new_atoms_to_cover])).union(target_clause_head_vars)
+                    variables_in_the_rest_of_the_body = reduce((lambda x, y: x.union(y)), [x.get_variables() for x in new_atoms_to_cover], set()).union(target_clause_head_vars)
                 else:
                     variables_in_the_rest_of_the_body = target_clause_head_vars
 
@@ -348,8 +350,11 @@ class Restructor:
             for length in range(self.min_literals, self.max_literals):
                 for cmb in combinations(all_predicates, length):
                     cands = reduce((lambda x, y: x.union(y)), [candidates[p] for p in cmb])
-                    cands = [x for x in combinations(cands, 2) if len(x[0].is_part_of(x[1])) and len(x[0]) != len(x[1])]
-                    self.redundant_candidates += [(x[0].get_head().get_predicate().get_name(), x[1].get_head().get_predicate().get_name()) for x in cands]
+                    cands_exact_length = [x for x in cands if len(x) == length]
+                    cands_more_length = [x for x in cands if len(x) > length]
+
+                    redundancies = [[x.get_head().get_predicate()] + [y.get_head().get_predicate() for y in cands_more_length if x.is_part_of(y)] for x in cands_exact_length]
+                    self.redundant_candidates = [tuple([p.get_name() for p in x]) for x in redundancies]
 
     def __create_var_map(self, model: cp_model.CpModel,
                          candidates: Set[Clause],
@@ -508,7 +513,8 @@ class Restructor:
 
         """
         for alt in self.redundant_candidates:
-            model.AddBoolOr([variable_map[x].Not() for x in alt])
+            # model.AddBoolOr([variable_map[x].Not() for x in alt])
+            model.Add(sum([variable_map[x] for x in alt]) <= 1)
 
     def __set_objective(self, model: cp_model.CpModel,
                         candidates: Set[Clause],
@@ -614,6 +620,9 @@ class Restructor:
 
         if self.exclude_alternatives:
             self.__eliminate_candidate_alternatives(model, variable_map)
+
+        if self.exclude_redundant_candidates:
+            self.__eliminate_redundant_candidates(model, variable_map)
 
         if not self.minimise_redundancy and self._objective_type == NUM_PREDICATES:
             # if we want to eliminate redundancy and we are minimizing the number of predicates
@@ -754,7 +763,9 @@ class Restructor:
                 encoded_clauses = self._encode_theory(clauses, iteration_candidates)
                 iteration_formulas.update(encoded_clauses)
                 for cl in focus_clauses:
-                    encodings_space[cl].append(ClausalTheory([v for v in encoded_clauses[cl]]))
+                    frms_to_add = [v for v in encoded_clauses[cl]]
+                    if len(frms_to_add):
+                        encodings_space[cl].append(ClausalTheory(frms_to_add))
             else:
                 for cl in encodings_space:
                     if len(encodings_space[cl]) == iteration_counter:
@@ -763,7 +774,9 @@ class Restructor:
                             continue
                         iteration_formulas.update(encoded_clauses)
                         # add encodings of all of the clauses
-                        encodings_space[cl].append(ClausalTheory(reduce((lambda x, y: x + y), [v for k, v in encoded_clauses.items()])))
+                        frms_to_add = reduce((lambda x, y: x + y), [v for k, v in encoded_clauses.items()], [])
+                        if len(frms_to_add):
+                            encodings_space[cl].append(ClausalTheory(frms_to_add))
                     else:
                         pass
 
@@ -780,7 +793,7 @@ class Restructor:
                         # if no refactoring is left after removing rejected predicates,
                         #       retain the rejected predicates that were used
                         if len(formulas_to_remove) == len(encodings_space[cl][-1]):
-                            used_preds = reduce((lambda x, y: x.union(y)), [x.get_predicates() for x in formulas_to_remove])
+                            used_preds = reduce((lambda x, y: x.union(y)), [x.get_predicates() for x in formulas_to_remove], set())
                             false_exclusions = false_exclusions.union(rejectedPredicates.intersection(used_preds))
 
                 # add false rejections to the iterations candidates
@@ -806,6 +819,12 @@ class Restructor:
                 # clear alternatives
                 rejectedPredicates = set([x.get_name() for x in rejectedPredicates])
                 self._candidate_exclusion = [x for x in self._candidate_exclusion if not any([p in rejectedPredicates for p in x])]
+
+            # find candidate redundancies
+            if self.exclude_redundant_candidates:
+                self._logger.info("\t Finding redundancies amongst candidates")
+                self._find_candidate_redundancies(iteration_candidates)
+                self._logger.info("\t\t\t done!")
 
             if self._objective_type == NUM_PREDICATES:
                 # detect all redundancies and co-occurences
