@@ -76,6 +76,21 @@ class Clause(Formula):
     def get_head(self):
         return self._head
 
+    def has_singleton_var(self) -> bool:
+        var_count = {}
+        for v in self._head.get_variables():
+            if v not in var_count:
+                var_count[v] = 0
+            var_count[v] += 1
+
+        for atm in self._body:
+            for v in atm.get_variables():
+                if v not in var_count:
+                    var_count[v] = 0
+                var_count[v] += 1
+
+        return len([1 for k, v in var_count.items() if v == 1]) > 0
+
     def _check_for_unification_with_body(self, literals: List[Union[Atom, Not]]) -> List[Dict[Term, Term]]:
         """
         Checks whether the body of the clause unifies with the provided set of literals

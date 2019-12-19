@@ -184,6 +184,9 @@ class Formula:
     def get_property(self, property_name: str):
         return self._properties.get(property_name, None)
 
+    def has_singleton_var(self) -> bool:
+        raise Exception("Not implemented yet!")
+
     def __hash__(self):
         if self._hash_cache is None:
             self._hash_cache = hash(self.__repr__())

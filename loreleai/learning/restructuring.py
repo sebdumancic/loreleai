@@ -29,7 +29,7 @@ class Restructor:
 
     def __init__(self, max_literals: int, min_literals: int = 2, head_variable_selection: int = 2, max_arity: int = 2,
                  minimise_redundancy=False, exact_redundancy=False, exclude_alternatives=False,
-                 objective_type=NUM_PREDICATES, exclude_redundant_cands=False,
+                 objective_type=NUM_PREDICATES, exclude_redundant_cands=False, reject_singleton=True,
                  logl=logging.INFO, logfile: str = None, logger=None):
         self.max_literals = max_literals
         self.min_literals = min_literals
@@ -41,6 +41,7 @@ class Restructor:
         self.candidate_usage_count = {}
         self.minimise_redundancy = minimise_redundancy
         self.minimise_redundancy_absolute_count = exact_redundancy
+        self.reject_singletons = reject_singleton
         self._candidate_exclusion = []
         self.exclude_alternatives = exclude_alternatives
         self.exclude_redundant_candidates = exclude_redundant_cands
@@ -92,19 +93,29 @@ class Restructor:
             # take all variables or number of variables is equal to max arity
             head_pred = global_context.predicate(head_name, len(available_vars), [x.get_type() for x in available_vars])
             # Predicate(head_name, len(available_vars), [x.get_type() for x in available_vars])
-            self.count_candidates += 1
             atom = global_context.atom(head_pred, available_vars)  # Atom(head_pred, available_vars)
-            return [Clause(atom, literals)]
+            cl = Clause(atom, literals)
+
+            if self.reject_singletons and cl.has_singleton_var():
+                return []
+            else:
+                self.count_candidates += 1
+                return [cl]
         elif variable_strategy == 2:
-            # need to select a subset
+            # need to select a subset of variables
             clauses = []
 
             for ind, var_cmb in enumerate(combinations(available_vars, max_arity)):
                 # head_pred = Predicate(f'{head_name}_{ind + 1}', len(var_cmb), [x.get_type() for x in var_cmb])
                 head_pred = global_context.predicate(f'{head_name}_{ind + 1}', len(var_cmb), [x.get_type() for x in var_cmb])
-                self.count_candidates += 1
                 atom = global_context.atom(head_pred, list(var_cmb))  # Atom(head_pred, list(var_cmb))
-                clauses.append(Clause(atom, literals))
+                cl = Clause(atom, literals)
+
+                if self.reject_singletons and cl.has_singleton_var():
+                    pass
+                else:
+                    self.count_candidates += 1
+                    clauses.append(cl)
 
             # remember the alternatives, and add constraint that only one of these can be taken
             # assumes that all candidates have unique heads
@@ -347,7 +358,7 @@ class Restructor:
             pass
         else:
             all_predicates = candidates.keys()
-            for length in range(self.min_literals, self.max_literals):
+            for length in range(2 if self.min_literals == 2 else self.min_literals, self.max_literals):
                 for cmb in combinations(all_predicates, length):
                     cands = reduce((lambda x, y: x.union(y)), [candidates[p] for p in cmb])
                     cands_exact_length = [x for x in cands if len(x) == length]
@@ -669,7 +680,15 @@ class Restructor:
 
         """
         self._logger.setLevel(logging.CRITICAL)
-        final_theory = list(reduce((lambda x, y: x.union(y)), [x for x in refactoring_predicates.values()]))
+        final_theory = list(reduce((lambda x, y: x.union(y)), [[p for p in x if len(p) > 1] for x in refactoring_predicates.values()], set()))
+
+        # resolve single literal clauses
+        single_body_cands = list(reduce((lambda x, y: x.union(y)), [[p for p in c if len(p) == 1] for c in refactoring_predicates.values()], set()))
+        single_mapping = dict([(x.get_head().get_predicate(), list(x.get_predicates())[0]) for x in single_body_cands])
+        while any([x in single_mapping for x in single_mapping.values()]):
+            for item in single_mapping:
+                if single_mapping[item] in single_mapping:
+                    single_mapping[item] = single_mapping[single_mapping[item]]
 
         for cl in clauses.get_formulas():
             steps = refactoring_steps[cl]
@@ -695,9 +714,25 @@ class Restructor:
 
             final_theory += tmp_frm
 
+        # if any atoms refer to single literal clause
+        new_frms = []
+        for frm_itm in final_theory:
+            if any([x in single_mapping for x in frm_itm.get_predicates()]):
+                tmp_head = frm_itm.get_head()
+                tmp_body = []
+                for atm in frm_itm.get_atoms():
+                    if atm.get_predicate() in single_mapping:
+                        tmp_body.append(global_context.atom(single_mapping[atm.get_predicate()], atm.get_terms()))
+                    else:
+                        tmp_body.append(atm)
+
+                new_frms.append(Clause(tmp_head, tmp_body))
+            else:
+                new_frms.append(frm_itm)
+
         self._logger.setLevel(self.log_level)
 
-        return ClausalTheory(final_theory)
+        return ClausalTheory(new_frms)
 
     def restructure(self, clauses: ClausalTheory, max_layers=None, max_predicate=None, num_threads=1, max_time_s=None,
                     prune_candidates=False):
@@ -737,7 +772,7 @@ class Restructor:
                 focus_clauses = list(encodings_space.keys())
             else:
                 focus_clauses = reduce((lambda x, y: x + y),
-                                       [encodings_space[x][iteration_counter-1].get_formulas() for x in encodings_space if len(encodings_space[x]) == iteration_counter])
+                                       [encodings_space[x][iteration_counter-1].get_formulas() for x in encodings_space if len(encodings_space[x]) == iteration_counter], [])
             focus_clauses = [x for x in focus_clauses if len(x) >= self.min_literals]
 
             iteration_candidates = self._get_candidates(focus_clauses)
