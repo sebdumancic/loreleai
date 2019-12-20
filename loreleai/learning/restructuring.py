@@ -6,7 +6,7 @@ from typing import Set, Dict, List, Tuple, Iterator, Union, Sequence
 
 from ortools.sat.python import cp_model
 
-from loreleai.language.commons import _are_two_set_of_literals_identical, global_context
+from loreleai.language.commons import _are_two_set_of_literals_identical, global_context, _create_term_signatures
 from loreleai.language.lp import Clause, Predicate, Atom, Term, ClausalTheory, are_variables_connected, Variable
 
 NUM_PREDICATES = 1
@@ -38,6 +38,7 @@ class Restructor:
         self.head_variable_selection_strategy = head_variable_selection
         self.max_arity = max_arity
         self.enumerated_bodies = {}
+        self.enumerated_body_signatures = {}
         self.candidate_usage_count = {}
         self.minimise_redundancy = minimise_redundancy
         self.minimise_redundancy_absolute_count = exact_redundancy
@@ -129,15 +130,19 @@ class Restructor:
     def __process_candidates(self, accumulator: Dict[Predicate, Set[Clause]], clause: Clause) -> Dict[Predicate, Set[Clause]]:
         for length in range(self.min_literals, self.max_literals + 1):
             for cmb in combinations(clause.get_atoms(), length):
-                predicate_sig = set([x.get_predicate() for x in cmb])
-                predicate_sig = tuple(sorted(predicate_sig, key=lambda x: x.get_name()))
+                cmb = list(cmb)
+                # predicate_sig =  set([x.get_predicate() for x in cmb])
+                predicate_sig = tuple(sorted([x.get_predicate() for x in cmb], key=lambda x: x.get_name()))
 
-                if not any([_are_two_set_of_literals_identical(list(cmb), x) for x in self.enumerated_bodies.get(predicate_sig, [])]):
+                potential_matches = [x for x in self.enumerated_bodies.get(predicate_sig, []) if len(x) == len(cmb)]
+
+                if not any([_are_two_set_of_literals_identical(cmb, self.enumerated_body_signatures[x]) for x in potential_matches]):
 
                     if predicate_sig not in self.enumerated_bodies:
                         self.enumerated_bodies[predicate_sig] = set()
 
                     self.enumerated_bodies[predicate_sig].add(tuple(cmb))
+                    self.enumerated_body_signatures[tuple(cmb)] = _create_term_signatures(cmb)
 
                     clauses = self.__create_latent_clause(list(cmb), self.head_variable_selection_strategy, self.max_arity)
                     for cl in clauses:
@@ -266,9 +271,7 @@ class Restructor:
             if cl not in self.candidate_usage_count:
                 self.candidate_usage_count[cl] = 0
             self.candidate_usage_count[cl] += 1
-        #encoding = map((lambda x: x.add_property("parent", originating_clause if originating_clause else clause)), encoding)
 
-        #return self.__encode(clause.get_atoms(), set(), atom_to_covering_clause_index, set(clause.get_head().get_variables()))
         return list(encoding)
 
     def _prune_candidate_set(self, candidates: Dict[Predicate, Set[Clause]]) -> Tuple[Dict[Predicate, Set[Clause]], Set[Clause]]:
@@ -766,6 +769,7 @@ class Restructor:
 
         while something_to_refactor:
             self.candidate_usage_count = {}
+            self.enumerated_body_signatures = {}
             self._logger.info(f"\tStarting iteration: {iteration_counter}")
             # collect clauses to focus on
             if iteration_counter == 0:

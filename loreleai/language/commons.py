@@ -9,6 +9,7 @@ class Term:
     def __init__(self, name, sym_type=None):
         self.name = name
         self.type = sym_type
+        self.hash_cache = None
 
     def __eq__(self, other):
         if isinstance(self, type(other)):
@@ -20,7 +21,9 @@ class Term:
         return self.name
 
     def __hash__(self):
-        return hash(self.__repr__())
+        if self.hash_cache is None:
+            self.hash_cache = hash(self.__repr__())
+        return self.hash_cache # hash(self.__repr__())
 
     def arity(self):
         raise Exception('Not implemented!')
@@ -63,7 +66,9 @@ class Variable(Term):
         return self.name
 
     def __hash__(self):
-        return hash(self.__repr__() + "/" + str(self.type))
+        if self.hash_cache is None:
+            self.hash_cache = hash(self.__repr__() + "/" + str(self.type))
+        return self.hash_cache  # hash(self.__repr__() + "/" + str(self.type))
 
     def __eq__(self, other):
         if isinstance(self, type(other)):
@@ -132,6 +137,7 @@ class Predicate:
         self.name = name
         self.arity = arity
         self.argument_types = arguments if arguments else [Type('thing') for _ in range(arity)]
+        self.hash_cache = None
 
     def get_name(self) -> str:
         return self.name
@@ -157,7 +163,9 @@ class Predicate:
         return "{}({})".format(self.name, ','.join([str(x) for x in self.argument_types]))
 
     def __hash__(self):
-        return hash(self.__repr__())
+        if self.hash_cache is None:
+            self.hash_cache = hash(self.__repr__())
+        return self.hash_cache
 
 
 class Formula:
@@ -318,15 +326,15 @@ def _create_term_signatures(literals: List[Union[Atom, Not]]) -> Dict[Term, Dict
     return term_signatures
 
 
-def _are_two_set_of_literals_identical(clause1: List[Atom], clause2: List[Atom]) -> bool:
-    clause1_sig = _create_term_signatures(clause1)
-    clause2_sig = _create_term_signatures(clause2)
+def _are_two_set_of_literals_identical(clause1: Union[List[Atom], Dict[Sequence[Predicate], Dict]],
+                                       clause2: Union[List[Atom], Dict[Sequence[Predicate], Dict]]) -> bool:
+    clause1_sig = _create_term_signatures(clause1) if isinstance(clause1, list) else clause1
+    clause2_sig = _create_term_signatures(clause2) if isinstance(clause2, list) else clause2
 
-    matches = dict([(x, y) for x in clause1_sig for y in clause2_sig
-                    if clause1_sig[x] == clause2_sig[y]])
+    clause1_sig = dict([(frozenset(v.items()), k) for k, v in clause1_sig.items()])
+    clause2_sig = dict([(frozenset(v.items()), k) for k, v in clause2_sig.items()])
 
-    if len(set(matches.values())) != len(matches):
-        return False
+    matches = clause1_sig.keys() & clause2_sig.keys()
 
     # TODO: this is wrong if constants are used
     # terms_cl1 = set()
@@ -339,7 +347,7 @@ def _are_two_set_of_literals_identical(clause1: List[Atom], clause2: List[Atom])
     #     for v in l.get_terms():
     #         terms_cl2.add(v)
 
-    return len(matches) == len(clause1_sig) and len(matches) == len(clause2_sig)
+    return len(matches) == max(len(clause1_sig), len(clause2_sig))
 
 
 class Context:

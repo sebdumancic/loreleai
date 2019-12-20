@@ -27,6 +27,8 @@ class Clause(Formula):
         self._body = body
         self._terms = set()
         self._repr_cache = None
+        self.term_signatures = None
+        self.inverted_term_signatures = None
 
         for lit in self._body:
             self._terms = self._terms.union(lit.get_terms())
@@ -106,11 +108,15 @@ class Clause(Formula):
 
         # TODO: check whether everything is correct for working with constants
         """
-        test_clause_literals = _create_term_signatures(literals)
-        clause_literals = _create_term_signatures(self._body)
+        if self.term_signatures is None:
+            self.term_signatures = _create_term_signatures(self._body)
+            self.inverted_term_signatures = dict([(frozenset(v.items()), k) for k, v in self.term_signatures.items()])
 
-        matches = [(x, y) for x in clause_literals for y in test_clause_literals if clause_literals[x] == test_clause_literals[y]]
-        matches = dict(matches)
+        test_clause_literals = _create_term_signatures(literals)
+        clause_literals = self.inverted_term_signatures
+
+        test_clause_literals = dict([(frozenset(v.items()), k) for k, v in test_clause_literals.items()])
+        matches = dict([(clause_literals[x], test_clause_literals[x]) for x in (clause_literals.keys() & test_clause_literals.keys())])
 
         if len(matches) < len(clause_literals):
             return [{}]
