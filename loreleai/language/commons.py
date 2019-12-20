@@ -325,12 +325,21 @@ def _are_two_set_of_literals_identical(clause1: List[Atom], clause2: List[Atom])
     matches = dict([(x, y) for x in clause1_sig for y in clause2_sig
                     if clause1_sig[x] == clause2_sig[y]])
 
+    if len(set(matches.values())) != len(matches):
+        return False
+
     # TODO: this is wrong if constants are used
-    terms = set()
-    for l in clause1:
-        for v in l.get_terms():
-            terms.add(v)
-    return len(matches) == len(terms)
+    # terms_cl1 = set()
+    # for l in clause1:
+    #     for v in l.get_terms():
+    #         terms_cl1.add(v)
+    #
+    # terms_cl2 = set()
+    # for l in clause2:
+    #     for v in l.get_terms():
+    #         terms_cl2.add(v)
+
+    return len(matches) == len(clause1_sig) and len(matches) == len(clause2_sig)
 
 
 class Context:
