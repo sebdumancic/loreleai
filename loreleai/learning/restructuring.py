@@ -479,8 +479,8 @@ class Restructor:
                 model.AddBoolAnd([level, encoding_exists_var]).OnlyEnforceIf(entire_level_component)
                 level_components.append(entire_level_component)
 
-            # at least one encoding has to be selected
-            model.AddBoolOr(level_components)
+            # at least one encoding has to be selected (or no encoding at all)
+            model.AddBoolOr(level_components + [clause_level_selection_vars[cl][0]])
 
             # exactly one encoding level has to be selected
             model.Add(sum(clause_level_selection_vars[cl]) == 1)
@@ -715,6 +715,9 @@ class Restructor:
                 tmp_frm = [x for x in re_frm]
                 steps -= 1
 
+            if not isinstance(tmp_frm, list):
+                tmp_frm = [tmp_frm]
+
             final_theory += tmp_frm
 
         # if any atoms refer to single literal clause
@@ -858,6 +861,8 @@ class Restructor:
                 # clear alternatives
                 rejectedPredicates = set([x.get_name() for x in rejectedPredicates])
                 self._candidate_exclusion = [x for x in self._candidate_exclusion if not any([p in rejectedPredicates for p in x])]
+            else:
+                all_refactoring_candidates.update(iteration_candidates)
 
             # find candidate redundancies
             if self.exclude_redundant_candidates:
