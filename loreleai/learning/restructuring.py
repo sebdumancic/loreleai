@@ -581,11 +581,18 @@ class Restructor:
             for cl in encodings:
                 for ind, eth in enumerate(encodings[cl]):
                     wcl = [(x, len(x) + 1) for x in eth.get_formulas()]  # + 1 to include the head predicate
-                    sum_at_current_level = model.NewIntVar(0, sum([v for k, v in wcl]), f'aux_sum_{self._get_candidate_index()}')
-                    model.Add(reduce((lambda x, y: x + y), [encoded_clause_vars[k]*v for k, v in wcl]) == sum_at_current_level)
-                    sub_component = model.NewIntVar(0, sum([v for k, v in wcl]),  f'aux_comp_{self._get_candidate_index()}')
-                    model.AddProdEquality(sub_component, [sum_at_current_level, encoding_level_vars[cl][ind+1]]) # +1 to account for 0 being no refactoring
-                    all_weighted_clauses.append(sub_component)
+                    # sum_at_current_level = model.NewIntVar(0, sum([v for k, v in wcl]), f'aux_sum_{self._get_candidate_index()}')
+                    # model.Add(reduce((lambda x, y: x + y), [encoded_clause_vars[k]*v for k, v in wcl]) == sum_at_current_level)
+                    # sub_component = model.NewIntVar(0, sum([v for k, v in wcl]),  f'aux_comp_{self._get_candidate_index()}')
+                    # model.AddProdEquality(sub_component, [sum_at_current_level, encoding_level_vars[cl][ind+1]]) # +1 to account for 0 being no refactoring
+                    # all_weighted_clauses.append(sub_component)
+
+                    level = encoding_level_vars[cl][ind+1]
+                    for f, cost in wcl:
+                        b = model.NewBoolVar(f'aux_and_{self._get_candidate_index()}')
+                        model.AddBoolAnd([level, encoded_clause_vars[f]]).OnlyEnforceIf(b)
+                        model.AddBoolOr([level.Not(), encoded_clause_vars[f].Not()]).OnlyEnforceIf(b.Not())
+                        all_weighted_clauses.append(b*cost)
 
                 # add no refactoring cost, encoding/refactoring level = 0
                 all_weighted_clauses.append(encoding_level_vars[cl][0]*(len(cl) + 1))
