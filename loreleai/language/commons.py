@@ -331,23 +331,26 @@ def _are_two_set_of_literals_identical(clause1: Union[List[Atom], Dict[Sequence[
     clause1_sig = _create_term_signatures(clause1) if isinstance(clause1, list) else clause1
     clause2_sig = _create_term_signatures(clause2) if isinstance(clause2, list) else clause2
 
-    clause1_sig = dict([(frozenset(v.items()), k) for k, v in clause1_sig.items()])
-    clause2_sig = dict([(frozenset(v.items()), k) for k, v in clause2_sig.items()])
+    if len(clause1_sig) != len(clause2_sig):
+        return False
+    else:
+        clause1_sig = dict([(frozenset(v.items()), k) for k, v in clause1_sig.items()])
+        clause2_sig = dict([(frozenset(v.items()), k) for k, v in clause2_sig.items()])
 
-    matches = clause1_sig.keys() & clause2_sig.keys()
+        matches = clause1_sig.keys() & clause2_sig.keys()
 
-    # TODO: this is wrong if constants are used
-    # terms_cl1 = set()
-    # for l in clause1:
-    #     for v in l.get_terms():
-    #         terms_cl1.add(v)
-    #
-    # terms_cl2 = set()
-    # for l in clause2:
-    #     for v in l.get_terms():
-    #         terms_cl2.add(v)
+        # TODO: this is wrong if constants are used
+        # terms_cl1 = set()
+        # for l in clause1:
+        #     for v in l.get_terms():
+        #         terms_cl1.add(v)
+        #
+        # terms_cl2 = set()
+        # for l in clause2:
+        #     for v in l.get_terms():
+        #         terms_cl2.add(v)
 
-    return len(matches) == max(len(clause1_sig), len(clause2_sig))
+        return len(matches) == max(len(clause1_sig), len(clause2_sig))
 
 
 class Context:
