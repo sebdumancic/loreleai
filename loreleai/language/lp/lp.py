@@ -8,7 +8,8 @@ from typing import List, Dict, Set, Tuple, Union, Iterator, Sequence
 import networkx as nx
 import pygraphviz as pgv
 
-from ..commons import Atom, Formula, Term, Predicate, Variable, Not, Theory, _create_term_signatures, global_context
+from ..commons import Atom, Formula, Term, Predicate, Variable, Not, Theory, _create_term_signatures, global_context, \
+    _are_two_set_of_literals_identical
 
 
 @dataclass
@@ -25,6 +26,7 @@ class Clause(Formula):
         super(Clause, self).__init__()
         self._head = head
         self._body = body
+        self._body = self._get_atom_order()
         self._terms = set()
         self._repr_cache = None
         self.term_signatures = None
@@ -77,6 +79,13 @@ class Clause(Formula):
 
     def get_head(self):
         return self._head
+
+    def get_term_signatures(self):
+        if self.term_signatures is None:
+            self.term_signatures = _create_term_signatures(self._body)
+            self.inverted_term_signatures = dict([(frozenset(v.items()), k) for k, v in self.term_signatures.items()])
+
+        return self.term_signatures
 
     def has_singleton_var(self) -> bool:
         var_count = {}
@@ -148,9 +157,11 @@ class Clause(Formula):
                 # construct potential sub-formulas that can be matched
                 matching_literals = clause.get_atoms(with_predicates=self.get_predicates())
                 for comb in combinations(matching_literals, len(self)):
+                    if not are_variables_connected(comb):
+                        continue
                     comb = list(comb)
                     answer = self._check_for_unification_with_body(comb)
-                    found_substitutions += [(comb, x) for x in answer]
+                    found_substitutions += [(comb, x) for x in answer if len(x)]
 
                 return found_substitutions
         else:
@@ -250,23 +261,42 @@ class Clause(Formula):
     def __len__(self):
         return len(self._body)
 
+    def _get_atom_order(self):
+        head_vars = self._head.get_variables()
+        all_atoms = [x for x in self._body]
+        focus_vars = [head_vars[0]]
+        processed_vars = set()
+        atom_order = []
+
+        while len(all_atoms) > 0:
+            matching_atms = [x for x in all_atoms if any([y in focus_vars for y in x.get_variables()])]
+            matching_atms = sorted(matching_atms, key=lambda x: min(
+                [x.get_variables().index(y) if y in x.get_variables() else 5 for y in focus_vars]))
+            processed_vars = processed_vars.union(focus_vars)
+            atom_order += matching_atms
+            all_atoms = [x for x in all_atoms if x not in matching_atms]
+            focus_vars = reduce((lambda x, y: x + y),
+                                [x.get_variables() for x in matching_atms if x not in processed_vars])
+
+        return atom_order
+
     def __repr__(self):
         if self._repr_cache is None:
-            head_vars = self._head.get_variables()
-            all_atoms = [x for x in self._body]
-            focus_vars = [head_vars[0]]
-            processed_vars = set()
-            atom_order = []
+            # head_vars = self._head.get_variables()
+            # all_atoms = [x for x in self._body]
+            # focus_vars = [head_vars[0]]
+            # processed_vars = set()
+            # atom_order = []
+            #
+            # while len(all_atoms) > 0:
+            #     matching_atms = [x for x in all_atoms if any([y in focus_vars for y in x.get_variables()])]
+            #     matching_atms = sorted(matching_atms, key=lambda x: min([x.get_variables().index(y) if y in x.get_variables() else 5 for y in focus_vars]))
+            #     processed_vars = processed_vars.union(focus_vars)
+            #     atom_order += matching_atms
+            #     all_atoms = [x for x in all_atoms if x not in matching_atms]
+            #     focus_vars = reduce((lambda x, y: x + y), [x.get_variables() for x in matching_atms if x not in processed_vars])
 
-            while len(all_atoms) > 0:
-                matching_atms = [x for x in all_atoms if any([y in focus_vars for y in x.get_variables()])]
-                matching_atms = sorted(matching_atms, key=lambda x: min([x.get_variables().index(y) if y in x.get_variables() else 5 for y in focus_vars]))
-                processed_vars = processed_vars.union(focus_vars)
-                atom_order += matching_atms
-                all_atoms = [x for x in all_atoms if x not in matching_atms]
-                focus_vars = reduce((lambda x, y: x + y), [x.get_variables() for x in matching_atms if x not in processed_vars])
-
-            self._repr_cache = "{} :- {}".format(self._head, ','.join([str(x) for x in atom_order]))
+            self._repr_cache = "{} :- {}".format(self._head, ','.join([str(x) for x in self._body]))
         return self._repr_cache
 
     def __hash__(self):
@@ -320,6 +350,37 @@ class ClausalTheory(Theory):
 
     def get_predicates(self) -> Set[Predicate]:
         return reduce((lambda x, y: x.union(y)), [x.get_predicates().union({x.get_head().get_predicate()}) for x in self._formulas])
+
+    def remove_duplicates(self):
+        new_forms = []
+
+        frms_per_length = {}
+        for frm in self._formulas:
+            l = len(frm)
+            if l not in frms_per_length:
+                frms_per_length[l] = []
+            frms_per_length[l].append(frm)
+
+        indices_to_remove = {}
+        for l in frms_per_length:
+            indices_to_remove[l] = set()
+            for ind in range(0, len(frms_per_length[l])-1):
+                for ind_i in range(ind+1, len(frms_per_length[l])):
+                    cl1 = frms_per_length[l][ind]
+                    cl2 = frms_per_length[l][ind_i]
+
+                    if cl1.get_predicates() == cl2.get_predicates() \
+                            and _are_two_set_of_literals_identical(cl1.get_term_signatures(), cl2.get_term_signatures()):
+                        indices_to_remove[l].add(ind_i)
+
+        for l in frms_per_length:
+            removed = 0
+            for ind in indices_to_remove[l]:
+                frms_per_length[l].pop(ind - removed)
+                removed += 1
+            new_forms += frms_per_length[l]
+
+        self._formulas = new_forms
 
     def unfold(self):
         """
