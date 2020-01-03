@@ -28,8 +28,9 @@ class Restructor:
     """
 
     def __init__(self, max_literals: int, min_literals: int = 2, head_variable_selection: int = 2, max_arity: int = 2,
-                 minimise_redundancy=False, exact_redundancy=False, exclude_alternatives=False,
-                 objective_type=NUM_PREDICATES, exclude_redundant_cands=False, reject_singleton=True,
+                 prevent_redundancies=False, minimise_redundancy=False, exact_redundancy=False, exclude_redundant_cands=False,
+                 exclude_alternatives=False, reject_singleton=True, allow_no_refactoring=False,
+                 objective_type=NUM_PREDICATES,
                  logl=logging.INFO, logfile: str = None, logger=None):
         self.max_literals = max_literals
         self.min_literals = min_literals
@@ -41,8 +42,10 @@ class Restructor:
         self.enumerated_body_signatures = {}
         self.candidate_usage_count = {}
         self.minimise_redundancy = minimise_redundancy
+        self.prevent_redundancies = prevent_redundancies
         self.minimise_redundancy_absolute_count = exact_redundancy
         self.reject_singletons = reject_singleton
+        self.allow_no_refactoring = allow_no_refactoring
         self._candidate_exclusion = []
         self.exclude_alternatives = exclude_alternatives
         self.exclude_redundant_candidates = exclude_redundant_cands
@@ -175,7 +178,8 @@ class Restructor:
                  atoms_covered: Set[Atom],
                  atom_covering: Dict[Atom, Dict[Clause, Set[Tuple[List[Atom], Dict[Term, Term]]]]],
                  target_clause_head_vars: Set[Variable],
-                 prefix=" ") -> Tuple[Set[Set[Atom]], Set[Clause]]:
+                 prefix=" ",
+                 allow_partial=False) -> Tuple[Set[Set[Atom]], Set[Clause]]:
         """
         Encoding of a set of atoms
         :param atoms_to_cover:
@@ -214,7 +218,10 @@ class Restructor:
                     variables_in_the_rest_of_the_body = target_clause_head_vars
 
                 if any([x in variables_in_the_rest_of_the_body for x in kicked_out_variables]):
-                    continue
+                    if allow_partial:
+                        encodings.add({focus_atom})
+                    else:
+                        continue
                 else:
                     used_clauses.add(cl)
                     # self._logger.debug(f'{prefix}|      atoms covered: {new_atoms_covered}; atoms to cover: {new_atoms_to_cover}')
@@ -232,7 +239,8 @@ class Restructor:
 
     def _encode_clause(self, clause: Clause,
                        candidates: Dict[Predicate, Set[Clause]],
-                       originating_clause: Clause) -> List[Clause]:
+                       originating_clause: Clause,
+                       allow_partial=False) -> List[Clause]:
         """
         Finds all possible encodings of the given clause by means of candidates
 
@@ -244,6 +252,8 @@ class Restructor:
 
         clause_predicates = clause.get_predicates()
         filtered_candidates = dict([(k, v) for (k, v) in candidates.items() if k in clause_predicates])
+        partial_rew_preds = reduce((lambda x, y: x.union(y)), filtered_candidates.values())
+        partial_rew_preds = set([x.get_head().get_predicate() for x in partial_rew_preds if len(x) == 1])
 
         # create index structure so that it is easy to get to the candidates that cover different atoms
         atom_to_covering_clause_index = {}
@@ -261,8 +271,16 @@ class Restructor:
                         if answer not in atom_to_covering_clause_index[atm][cand]:
                             atom_to_covering_clause_index[atm][cand].append(answer)
 
-        encoding, used_clauses = self.__encode(clause.get_atoms(), set(), atom_to_covering_clause_index, set(clause.get_head().get_variables()))
-        encoding = [Clause(clause.get_head(), list(x)) for x in encoding if len(x) < len(clause)]  # if refactoring does not reduce the length on th clause, reject it
+        encoding, used_clauses = self.__encode(clause.get_atoms(), set(), atom_to_covering_clause_index, set(clause.get_head().get_variables()), allow_partial=allow_partial)
+        # if refactoring does not reduce the length on th clause, reject it
+        #       reject also if the refactored clause mostly consists of unary mappings (partial rewrites)
+        encoding = [Clause(clause.get_head(), list(x)) for x in encoding if len(x) < len(clause)]
+
+        filtered_1 = [x for x in encoding if len(partial_rew_preds.intersection(x.get_predicates())) < int(len(clause)/2)]
+        # if len(filtered_1) == 0:
+        #     filtered_1 = [x for x in encoding if len(partial_rew_preds.intersection(x.get_predicates())) <= int(len(clause)/2)]
+        encoding = [x for x in filtered_1]
+
         for cl in encoding:
             cl.add_property("parent", originating_clause if originating_clause else clause)
 
@@ -361,14 +379,17 @@ class Restructor:
             pass
         else:
             all_predicates = candidates.keys()
-            for length in range(2 if self.min_literals == 2 else self.min_literals, self.max_literals):
+            for length in range(2, self.max_literals):
                 for cmb in combinations(all_predicates, length):
                     cands = reduce((lambda x, y: x.union(y)), [candidates[p] for p in cmb])
+                    cands = [x for x in cands if all([p in cmb for p in x.get_predicates()])]
                     cands_exact_length = [x for x in cands if len(x) == length]
                     cands_more_length = [x for x in cands if len(x) > length]
 
-                    redundancies = [[x.get_head().get_predicate()] + [y.get_head().get_predicate() for y in cands_more_length if x.is_part_of(y)] for x in cands_exact_length]
-                    self.redundant_candidates = [tuple([p.get_name() for p in x]) for x in redundancies]
+                    redundancies = [[x.get_head().get_predicate()] + [y.get_head().get_predicate() for y in cands_more_length if len(x.is_part_of(y))] for x in cands_exact_length]
+                    redundancies = [x for x in redundancies if len(x) > 1]
+                    if len(redundancies):
+                        self.redundant_candidates += [tuple([p.get_name() for p in x]) for x in redundancies]
 
     def __create_var_map(self, model: cp_model.CpModel,
                          candidates: Set[Clause],
@@ -400,7 +421,8 @@ class Restructor:
         for co in co_occurrences:
             variable_map[co] = model.NewBoolVar(f'aux{aux_var_index}')
             # create the equality relating the aux variable to a product of
-            model.AddMultiplicationEquality(variable_map[co], [variable_map[x] for x in co])
+            model.AddBoolAnd([variable_map[x] for x in co]).OnlyEnforceIf(variable_map[co])
+            #model.AddMultiplicationEquality(variable_map[co], [variable_map[x] for x in co])
 
             # increase the index for the next aux var created
             aux_var_index += 1
@@ -480,7 +502,13 @@ class Restructor:
                 level_components.append(entire_level_component)
 
             # at least one encoding has to be selected (or no encoding at all)
-            model.AddBoolOr(level_components + [clause_level_selection_vars[cl][0]])
+            if self.allow_no_refactoring:
+                level_components += [clause_level_selection_vars[cl][0]]
+            else:
+                model.Add(clause_level_selection_vars[cl][0] == 0)
+
+            if len(level_components):
+                model.AddBoolOr(level_components)
 
             # exactly one encoding level has to be selected
             model.Add(sum(clause_level_selection_vars[cl]) == 1)
@@ -491,8 +519,10 @@ class Restructor:
                                             redundancies: Dict[int, Dict[Sequence[str], Sequence[Clause]]],
                                             variable_map: Dict[Union[str, Iterator[str]], cp_model.IntVar],
                                             encoded_clause_vars: Dict[Clause, cp_model.IntVar],
-                                            encoding_level_vars: Dict[Clause, Sequence[cp_model.IntVar]]):
+                                            encoding_level_vars: Dict[Clause, Sequence[cp_model.IntVar]],
+                                            reify: bool = False):
 
+        to_return = []
         for level in redundancies:
             for redundancy_pattern in redundancies[level]:
                 all_with_pattern = []
@@ -503,7 +533,29 @@ class Restructor:
                     model.AddBoolAnd([corresponding_level_var, encoded_clause_vars[cl]]).OnlyEnforceIf(b)
                     model.AddBoolOr([corresponding_level_var.Not(), encoded_clause_vars[cl].Not()]).OnlyEnforceIf(b.Not())
                     all_with_pattern.append(b)
-                model.Add(sum(all_with_pattern) <= 1)
+
+                if reify:
+                    if self.minimise_redundancy_absolute_count:
+                        if self.equals_zero is None:
+                            self.equals_zero = model.NewBoolVar('equals_zero')
+                            model.Add(self.equals_zero == 0)
+
+                        out_b = model.NewIntVar(-1, len(all_with_pattern), f'aux_red_sum_{self._get_candidate_index()}')
+                        model.Add((sum(
+                            all_with_pattern) - 1) == out_b)  # -1 allows to use 1 of the potentially redundant clauses, if only 1 is used there is no redundancy
+                        b_max = model.NewBoolVar(f'aux_redmax_{self._get_candidate_index()}')
+                        model.AddMaxEquality(b_max, [self.equals_zero, out_b])
+                        to_return.append(b_max)
+                    else:
+                        out_b = model.NewBoolVar(f'aux_red_sum_{self._get_candidate_index()}')
+                        model.Add(sum(all_with_pattern) <= 1).OnlyEnforceIf(
+                            out_b.Not())  # reasoning inverted because out_b=0 means no redundancy
+                        model.Add(sum(all_with_pattern) > 1).OnlyEnforceIf(out_b)
+                        to_return.append(out_b)
+                else:
+                    model.Add(sum(all_with_pattern) <= 1)
+
+        return to_return
 
     def __eliminate_candidate_alternatives(self, model: cp_model.CpModel,
                                            variable_map: Dict[Union[str, Iterator[str]], cp_model.IntVar]):
@@ -521,14 +573,24 @@ class Restructor:
             model.Add(sum([variable_map[x] for x in alt]) <= 1)
 
     def __eliminate_redundant_candidates(self, model: cp_model.CpModel,
-                                         variable_map: Dict[Union[str, Iterator[str]], cp_model.IntVar]):
+                                         variable_map: Dict[Union[str, Iterator[str]], cp_model.IntVar],
+                                         reify: bool = False):
         """
         Eliminates redundant candidates in the solution (imposes the same constraint __eliminate_candidate_alternatives)
 
         """
+        to_return = []
         for alt in self.redundant_candidates:
             # model.AddBoolOr([variable_map[x].Not() for x in alt])
-            model.Add(sum([variable_map[x] for x in alt]) <= 1)
+            if reify:
+                b = model.NewBoolVar(f'aux_cr_{self._get_candidate_index()}')
+                model.Add(sum([variable_map[x] for x in alt]) <= 1).OnlyEnforceIf(b.Not())
+                model.Add(sum([variable_map[x] for x in alt]) > 1).OnlyEnforceIf(b)
+                to_return.append(b)
+            else:
+                model.Add(sum([variable_map[x] for x in alt]) <= 1)
+
+        return to_return
 
     def __set_objective(self, model: cp_model.CpModel,
                         candidates: Set[Clause],
@@ -537,55 +599,29 @@ class Restructor:
                         encoded_clause_vars: Dict[Clause, cp_model.IntVar],
                         encoding_level_vars: Dict[Clause, Sequence[cp_model.IntVar]],
                         encodings: Dict[Clause, Sequence[ClausalTheory]]):
-        vars_to_use = [x.get_head().get_predicate().get_name() for x in candidates]
-        vars_to_use = [variable_map[x] for x in vars_to_use]
+
+        individual_redunds = []
+        if self.minimise_redundancy and self.prevent_redundancies:
+            individual_redunds += self.__eliminate_redundancy_in_solutions(model, redundancies, variable_map, encoded_clause_vars, encoding_level_vars, reify=True)
+
+        if self.minimise_redundancy and self.exclude_redundant_candidates:
+            individual_redunds += self.__eliminate_redundant_candidates(model, variable_map, reify=True)
 
         if self._objective_type == NUM_PREDICATES:
+            vars_to_use = [x.get_head().get_predicate().get_name() for x in candidates]
+            vars_to_use = [variable_map[x] for x in vars_to_use]
+
             if self.minimise_redundancy:
-                # creating redundnancy indicator variables
-
-                if self.minimise_redundancy_absolute_count:
-                    # if we are minimising the exact count, we need the zero var
-                    self.equals_zero = model.NewBoolVar('equals_zero')
-                    model.Add(self.equals_zero == 0)
-
-                individual_redunds = []
-                for encoding_level in redundancies:
-                    for redundancy_pattern in redundancies[encoding_level]:
-                        all_with_pattern = []
-                        for cl in redundancies[encoding_level][redundancy_pattern]:
-                            corresponding_level_var = encoding_level_vars[cl.get_property("parent")][encoding_level+1] # +1 to account for 0 being no refactoring
-                            b = model.NewBoolVar(f'aux_red_{self._get_candidate_index()}')
-                            model.AddBoolAnd([corresponding_level_var, encoded_clause_vars[cl]]).OnlyEnforceIf(b)
-                            model.AddBoolOr([corresponding_level_var.Not(), encoded_clause_vars[cl].Not()]).OnlyEnforceIf(b.Not())
-                            all_with_pattern.append(b)
-
-                        if self.minimise_redundancy_absolute_count:
-                            out_b = model.NewIntVar(-1, len(all_with_pattern), f'aux_red_sum_{self._get_candidate_index()}')
-                            model.Add((sum(all_with_pattern) - 1) == out_b)  # -1 allows to use 1 of the potentially redundant clauses, if only 1 is used there is no redundancy
-                            b_max = model.NewBoolVar(f'aux_redmax_{self._get_candidate_index()}')
-                            model.AddMaxEquality(b_max, [self.equals_zero, out_b])
-                            individual_redunds.append(b_max)
-                        else:
-                            out_b = model.NewBoolVar(f'aux_red_sum_{self._get_candidate_index()}')
-                            model.Add(sum(all_with_pattern) <= 1).OnlyEnforceIf(out_b.Not())  # reasoning inverted because out_b=0 means no redundancy
-                            model.Add(sum(all_with_pattern) > 1).OnlyEnforceIf(out_b)
-                            individual_redunds.append(out_b)
-
-                model.Minimize(sum(vars_to_use + individual_redunds))
+                model.Minimize(reduce((lambda x, y: x + y), vars_to_use + individual_redunds))
             else:
                 model.Minimize(reduce((lambda x, y: x + y), vars_to_use))
+
         elif self._objective_type == NUM_LITERALS:
             all_weighted_clauses = []
             # lengths of selected clauses
             for cl in encodings:
                 for ind, eth in enumerate(encodings[cl]):
                     wcl = [(x, len(x) + 1) for x in eth.get_formulas()]  # + 1 to include the head predicate
-                    # sum_at_current_level = model.NewIntVar(0, sum([v for k, v in wcl]), f'aux_sum_{self._get_candidate_index()}')
-                    # model.Add(reduce((lambda x, y: x + y), [encoded_clause_vars[k]*v for k, v in wcl]) == sum_at_current_level)
-                    # sub_component = model.NewIntVar(0, sum([v for k, v in wcl]),  f'aux_comp_{self._get_candidate_index()}')
-                    # model.AddProdEquality(sub_component, [sum_at_current_level, encoding_level_vars[cl][ind+1]]) # +1 to account for 0 being no refactoring
-                    # all_weighted_clauses.append(sub_component)
 
                     level = encoding_level_vars[cl][ind+1]
                     for f, cost in wcl:
@@ -595,7 +631,8 @@ class Restructor:
                         all_weighted_clauses.append(b*cost)
 
                 # add no refactoring cost, encoding/refactoring level = 0
-                all_weighted_clauses.append(encoding_level_vars[cl][0]*(len(cl) + 1))
+                if self.allow_no_refactoring:
+                    all_weighted_clauses.append(encoding_level_vars[cl][0]*(len(cl) + 1))
 
             # lengths of selected candidates
             # exclude 1-length candidates because they help with partial refactoring:
@@ -603,7 +640,11 @@ class Restructor:
             candidate_lengths = [(x.get_head().get_predicate().get_name(), len(x) + 1) for x in candidates if len(x) > 1]
             candidate_lengths = [variable_map[k]*v for k, v in candidate_lengths]
 
-            model.Minimize(reduce((lambda x, y: x + y), all_weighted_clauses + candidate_lengths))
+            if self.minimise_redundancy:
+                model.Minimize(reduce((lambda x, y: x + y), all_weighted_clauses + candidate_lengths + individual_redunds))
+            else:
+                model.Minimize(
+                    reduce((lambda x, y: x + y), all_weighted_clauses + candidate_lengths))
 
         else:
             raise Exception(f'unknown objective function {self._objective_type}')
@@ -642,10 +683,10 @@ class Restructor:
         if self.exclude_alternatives:
             self.__eliminate_candidate_alternatives(model, variable_map)
 
-        if self.exclude_redundant_candidates:
+        if self.exclude_redundant_candidates and not self.minimise_redundancy:
             self.__eliminate_redundant_candidates(model, variable_map)
 
-        if not self.minimise_redundancy and self._objective_type == NUM_PREDICATES:
+        if self.prevent_redundancies and not self.minimise_redundancy:
             # if we want to eliminate redundancy and we are minimizing the number of predicates
             self.__eliminate_redundancy_in_solutions(model, redundancies, variable_map, encoded_cls_var, cls_level_indicators)
         self.__set_objective(model, candidates, variable_map, redundancies if self.minimise_redundancy else (), encoded_cls_var, cls_level_indicators, encodings)
@@ -810,7 +851,7 @@ class Restructor:
             # extend the encoding of each original clause with the new layer of encodings
             if iteration_counter == 0:
                 encoded_clauses = self._encode_theory(clauses, iteration_candidates)
-                iteration_formulas.update(encoded_clauses)
+                #iteration_formulas.update(encoded_clauses)
                 for cl in focus_clauses:
                     frms_to_add = [v for v in encoded_clauses[cl]]
                     if len(frms_to_add):
@@ -821,7 +862,7 @@ class Restructor:
                         encoded_clauses = self._encode_theory([x for x in encodings_space[cl][iteration_counter-1].get_formulas() if len(x) >= self.min_literals], iteration_candidates, originating_clause=cl)
                         if len(encoded_clauses) == 0:
                             continue
-                        iteration_formulas.update(encoded_clauses)
+                        #iteration_formulas.update(encoded_clauses)
                         # add encodings of all of the clauses
                         frms_to_add = reduce((lambda x, y: x + y), [v for k, v in encoded_clauses.items()], [])
                         if len(frms_to_add):
@@ -859,6 +900,7 @@ class Restructor:
                 for cl in encodings_space:
                     if len(encodings_space[cl]) > iteration_counter:
                         encodings_space[cl][-1].remove_formulas_with_predicates(rejectedPredicates)
+                        iteration_formulas[cl] = encodings_space[cl][-1].get_formulas()
 
                 # clear the clause dependencies
                 for rej_can in rejectedPredicates:
@@ -870,6 +912,9 @@ class Restructor:
                 self._candidate_exclusion = [x for x in self._candidate_exclusion if not any([p in rejectedPredicates for p in x])]
             else:
                 all_refactoring_candidates.update(iteration_candidates)
+                for cl in encodings_space:
+                    if len(encodings_space[cl]) > iteration_counter:
+                        iteration_formulas[cl] = encodings_space[cl][-1].get_formulas()
 
             # find candidate redundancies
             if self.exclude_redundant_candidates:
@@ -877,11 +922,12 @@ class Restructor:
                 self._find_candidate_redundancies(iteration_candidates)
                 self._logger.info("\t\t\t done!")
 
-            if self._objective_type == NUM_PREDICATES:
+            if self.prevent_redundancies:
                 # detect all redundancies and co-occurences
                 tmp_redundancies, tmp_cooccurrences = self._find_redundancies(iteration_formulas)
-                all_cooccurences += tmp_cooccurrences
-                all_redundancies[iteration_counter] = tmp_redundancies
+            #     all_cooccurences += tmp_cooccurrences
+                if len(tmp_redundancies):
+                    all_redundancies[iteration_counter] = tmp_redundancies
 
             iteration_counter += 1
 
