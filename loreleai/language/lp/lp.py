@@ -468,16 +468,17 @@ class ClausalTheory(Theory):
             graph.add_node(cl_to_node_name[p], color='blue')
 
         for cl in self._formulas:
-            ind = len(cl_to_node_name)
-            cl_to_node_name[cl] = ind if only_numbers else str(cl)
-            cl_to_node_name[cl.get_head().get_predicate()] = ind if only_numbers else str(cl)
-            graph.add_node(cl_to_node_name[cl], clause=cl, color='black' if ('latent' in cl.get_head().get_predicate().get_name() or "_" in cl.get_head().get_predicate().get_name()) else 'red')
+            if cl.get_head().get_predicate() not in cl_to_node_name:
+                ind = len(cl_to_node_name)
+                #cl_to_node_name[cl] = ind if only_numbers else str(cl)
+                cl_to_node_name[cl.get_head().get_predicate()] = ind if only_numbers else str(cl.get_head().get_predicate())
+                graph.add_node(cl_to_node_name[cl.get_head().get_predicate()], clause=cl.get_head().get_predicate(), color='black' if ('latent' in cl.get_head().get_predicate().get_name() or "_" in cl.get_head().get_predicate().get_name()) else 'red')
 
         for cl in self._formulas:
             body_p = [x.get_predicate() for x in cl.get_atoms()]
 
             for p in body_p:
-                graph.add_edge(cl_to_node_name[cl], cl_to_node_name[p])
+                graph.add_edge(cl_to_node_name[cl.get_head().get_predicate()], cl_to_node_name[p])
 
         graph.draw(filename, prog='dot')
 
