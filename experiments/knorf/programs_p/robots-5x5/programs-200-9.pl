@@ -1,0 +1,15 @@
+p10(A,B):-move_backwards(A,B).
+p35(A,B):-move_right(A,B).
+p104(A,B):-move_right(A,C),move_forwards(C,B).
+p149(A,B):-move_left(A,C),move_backwards(C,B).
+p193(A,B):-move_left(A,C),move_right(C,B).
+p111(A,B):-p111_1(A,C),p111_1(C,B).
+p111_1(A,B):-move_right(A,C),move_right(C,B).
+p148(A,B):-move_right(A,C),p148_1(C,B).
+p148_1(A,B):-move_right(A,C),move_backwards(C,B).
+p63(A,B):-move_left(A,C),p63_1(C,B).
+p63_1(A,B):-move_left(A,C),p63_2(C,B).
+p63_2(A,B):-move_left(A,C),p149(C,B).
+p142(A,B):-p104(A,C),p142_1(C,B).
+p142_1(A,B):-p104(A,C),p142_2(C,B).
+p142_2(A,B):-grab_ball(A,C),move_right(C,B).

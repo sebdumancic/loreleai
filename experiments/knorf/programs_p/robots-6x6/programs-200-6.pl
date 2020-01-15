@@ -1,0 +1,17 @@
+p158(A,B):-move_forwards(A,B).
+p53(A,B):-move_left(A,C),p53_1(C,B).
+p53_1(A,B):-move_forwards(A,C),move_forwards(C,B).
+p176(A,B):-grab_ball(A,C),p176_1(C,B).
+p176_1(A,B):-move_backwards(A,C),drop_ball(C,B).
+p112(A,B):-p176(A,C),p112_1(C,B).
+p112_1(A,B):-move_right(A,C),p112_2(C,B).
+p112_2(A,B):-move_right(A,C),move_forwards(C,B).
+p122(A,B):-move_right(A,C),p122_1(C,B).
+p122_1(A,B):-move_right(A,C),p122_2(C,B).
+p122_2(A,B):-move_right(A,C),move_backwards(C,B).
+p144(A,B):-move_left(A,C),p144_1(C,B).
+p144_1(A,B):-grab_ball(A,C),p144_2(C,B).
+p144_2(A,B):-p53_1(A,C),drop_ball(C,B).
+p191(A,B):-move_left(A,C),p191_1(C,B).
+p191_1(A,B):-p191_2(A,C),p191_2(C,B).
+p191_2(A,B):-move_left(A,C),move_left(C,B).
