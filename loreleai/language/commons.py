@@ -6,6 +6,7 @@ class Term:
     """
         Term base class. A common base class for Predicate, Constant, Variable and Functor symbols.
     """
+
     def __init__(self, name, sym_type=None):
         self.name = name
         self.type = sym_type
@@ -23,10 +24,10 @@ class Term:
     def __hash__(self):
         if self.hash_cache is None:
             self.hash_cache = hash(self.__repr__())
-        return self.hash_cache # hash(self.__repr__())
+        return self.hash_cache  # hash(self.__repr__())
 
     def arity(self):
-        raise Exception('Not implemented!')
+        raise Exception("Not implemented!")
 
     def get_type(self):
         return self.type
@@ -79,19 +80,20 @@ class Variable(Term):
 
 @dataclass
 class Structure(Term):
-
     def __init__(self, name: str, sym_type, arguments):
         super(Structure, self).__init__(name, sym_type)
         self.arguments = arguments
 
     def __repr__(self):
-        return "{}({})".format(self.name, ','.join(self.arguments))
+        return "{}({})".format(self.name, ",".join(self.arguments))
 
     def __eq__(self, other):
         if isinstance(self, type(other)):
-            return self.name == other.type and \
-                   len(self.arguments) == len(other.arguments) and \
-                   all([x == y for (x, y) in zip(self.arguments, other.arguments)])
+            return (
+                self.name == other.type
+                and len(self.arguments) == len(other.arguments)
+                and all([x == y for (x, y) in zip(self.arguments, other.arguments)])
+            )
         else:
             return False
 
@@ -100,7 +102,6 @@ class Structure(Term):
 
 
 class Type:
-
     def __init__(self, name: str):
         self.name = name
         self.elements = set()
@@ -132,11 +133,12 @@ class Type:
 
 @dataclass
 class Predicate:
-
     def __init__(self, name: str, arity: int, arguments: List[Type] = None):
         self.name = name
         self.arity = arity
-        self.argument_types = arguments if arguments else [Type('thing') for _ in range(arity)]
+        self.argument_types = (
+            arguments if arguments else [Type("thing") for _ in range(arity)]
+        )
         self.hash_cache = None
 
     def get_name(self) -> str:
@@ -153,14 +155,23 @@ class Predicate:
 
     def __eq__(self, other):
         if isinstance(self, type(other)):
-            return self.get_name() == other.get_name() and \
-                   self.get_arity() == other.get_arity() and \
-                   all([x == y for (x, y) in zip(self.argument_types, other.get_arg_types())])
+            return (
+                self.get_name() == other.get_name()
+                and self.get_arity() == other.get_arity()
+                and all(
+                    [
+                        x == y
+                        for (x, y) in zip(self.argument_types, other.get_arg_types())
+                    ]
+                )
+            )
         else:
             return False
 
     def __repr__(self):
-        return "{}({})".format(self.name, ','.join([str(x) for x in self.argument_types]))
+        return "{}({})".format(
+            self.name, ",".join([str(x) for x in self.argument_types])
+        )
 
     def __hash__(self):
         if self.hash_cache is None:
@@ -169,7 +180,6 @@ class Predicate:
 
 
 class Formula:
-
     def __init__(self):
         self._properties = {}
         self._hash_cache = None
@@ -204,7 +214,6 @@ class Formula:
 
 @dataclass
 class Atom(Formula):
-
     def __init__(self, predicate: Predicate, arguments: List[Term]):
         super(Atom, self).__init__()
         self.predicate = predicate
@@ -212,7 +221,10 @@ class Atom(Formula):
         self.arg_signature = []
 
     def substitute(self, term_map: Dict[Term, Term]):
-        return global_context.atom(self.predicate, [term_map[x] if x in term_map else x for x in self.arguments])
+        return c_atom(
+            self.predicate,
+            [term_map[x] if x in term_map else x for x in self.arguments],
+        )
 
     def get_predicate(self) -> Predicate:
         return self.predicate
@@ -227,11 +239,15 @@ class Atom(Formula):
         return [x for x in self.arguments]
 
     def __repr__(self):
-        return "{}({})".format(self.predicate.get_name(), ','.join([str(x) for x in self.arguments]))
+        return "{}({})".format(
+            self.predicate.get_name(), ",".join([str(x) for x in self.arguments])
+        )
 
     def __eq__(self, other):
         if isinstance(self, type(other)):
-            return self.predicate == other.predicate and self.arguments == other.arguments  # _are_two_set_of_literals_identical([self], [other])
+            return (
+                self.predicate == other.predicate and self.arguments == other.arguments
+            )
         else:
             return False
 
@@ -244,7 +260,6 @@ class Atom(Formula):
 
 @dataclass
 class Not(Formula):
-
     def __init__(self, formula: Formula):
         super(Not, self).__init__()
         self.formula = formula
@@ -272,9 +287,8 @@ class Not(Formula):
 
 
 class Theory:
-
     def __init__(self, formulas: Sequence[Formula]):
-        self._formulas = formulas
+        self._formulas: Sequence = formulas
 
     def get_formulas(self, predicates: Set[Predicate] = None) -> Sequence[Formula]:
         if predicates:
@@ -289,10 +303,12 @@ class Theory:
         return sum([len(x) for x in self._formulas])
 
     def get_predicates(self) -> Set[Predicate]:
-        raise Exception('Not implemented yet!')
+        raise Exception("Not implemented yet!")
 
 
-def _create_term_signatures(literals: List[Union[Atom, Not]]) -> Dict[Term, Dict[Tuple[Predicate], int]]:
+def _create_term_signatures(
+    literals: List[Union[Atom, Not]]
+) -> Dict[Term, Dict[Tuple[Predicate], int]]:
     """
         Creates a term signature for each term in the set of literals
 
@@ -316,7 +332,7 @@ def _create_term_signatures(literals: List[Union[Atom, Not]]) -> Dict[Term, Dict
             if isinstance(lit, Not):
                 tmp_atm = lit.get_formula()
                 if isinstance(tmp_atm, Atom):
-                    tmp_sig = (f'not_{tmp_atm.get_predicate().get_name()}', ind)
+                    tmp_sig = (f"not_{tmp_atm.get_predicate().get_name()}", ind)
                 else:
                     raise Exception("Only atom can be negated!")
             else:
@@ -326,10 +342,22 @@ def _create_term_signatures(literals: List[Union[Atom, Not]]) -> Dict[Term, Dict
     return term_signatures
 
 
-def _are_two_set_of_literals_identical(clause1: Union[List[Atom], Dict[Sequence[Predicate], Dict]],
-                                       clause2: Union[List[Atom], Dict[Sequence[Predicate], Dict]]) -> bool:
-    clause1_sig = _create_term_signatures(clause1) if isinstance(clause1, list) else clause1
-    clause2_sig = _create_term_signatures(clause2) if isinstance(clause2, list) else clause2
+def _are_two_set_of_literals_identical(
+    clause1: Union[List[Atom], Dict[Sequence[Predicate], Dict]],
+    clause2: Union[List[Atom], Dict[Sequence[Predicate], Dict]],
+) -> bool:
+    """
+    Checks whether two sets of literal are identical, i.e. unify, up to the variable naming
+    :param clause1:
+    :param clause2:
+    :return:
+    """
+    clause1_sig = (
+        _create_term_signatures(clause1) if isinstance(clause1, list) else clause1
+    )
+    clause2_sig = (
+        _create_term_signatures(clause2) if isinstance(clause2, list) else clause2
+    )
 
     if len(clause1_sig) != len(clause2_sig):
         return False
@@ -354,29 +382,30 @@ def _are_two_set_of_literals_identical(clause1: Union[List[Atom], Dict[Sequence[
 
 
 class Context:
-
     def __init__(self):
-        self._predicates = {}       # name/arity -> Predicate
-        self._variables = {}        # domain -> {name -> Variable}
-        self._constants = {}        # domain -> {name -> Constant}
-        self._atoms = {}            # Predicate -> { tuple of terms -> Atom}
-        self._domains = {'thing': Type('thing')}   # name -> Type
+        self._predicates = {}  # name/arity -> Predicate
+        self._variables = {}  # domain -> {name -> Variable}
+        self._constants = {}  # domain -> {name -> Constant}
+        self._atoms = {}  # Predicate -> { tuple of terms -> Atom}
+        self._domains = {"thing": Type("thing")}  # name -> Type
 
     def _predicate_sig(self, name, arity):
         return f"{name}/{arity}"
 
     def predicate(self, name, arity, domains=()) -> Predicate:
         if len(domains) == 0:
-            domains = [self._domains['thing']]*arity
+            domains = [self._domains["thing"]] * arity
 
         if not self._predicate_sig(name, arity) is self._predicates:
-            self._predicates[self._predicate_sig(name, arity)] = Predicate(name, arity, domains)
+            self._predicates[self._predicate_sig(name, arity)] = Predicate(
+                name, arity, domains
+            )
 
         return self._predicates[self._predicate_sig(name, arity)]
 
     def variable(self, name, domain=None) -> Variable:
         if domain is None:
-            domain = 'thing'
+            domain = "thing"
 
         if domain not in self._variables:
             self._variables[domain] = {}
@@ -388,7 +417,7 @@ class Context:
 
     def constant(self, name, domain=None) -> Constant:
         if domain is None:
-            domain = 'thing'
+            domain = "thing"
 
         if domain not in self._constants:
             self._constants[domain] = {}
@@ -410,3 +439,30 @@ class Context:
 
 global_context = Context()
 
+
+def _get_proper_context(ctx) -> Context:
+    if ctx is None:
+        global global_context
+        return global_context
+    else:
+        return ctx
+
+
+def c_pred(name, arity, domains=(), ctx: Context = None) -> Predicate:
+    ctx = _get_proper_context(ctx)
+    return ctx.predicate(name, arity, domains=domains)
+
+
+def c_const(name, domain=None, ctx: Context = None) -> Constant:
+    ctx = _get_proper_context(ctx)
+    return ctx.constant(name, domain=domain)
+
+
+def c_var(name, domain=None, ctx: Context = None) -> Variable:
+    ctx = _get_proper_context(ctx)
+    return ctx.variable(name, domain=domain)
+
+
+def c_atom(predicate: Predicate, arguments: List[Term], ctx: Context = None) -> Atom:
+    ctx = _get_proper_context(ctx)
+    return ctx.atom(predicate, arguments)

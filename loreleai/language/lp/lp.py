@@ -8,8 +8,9 @@ from typing import List, Dict, Set, Tuple, Union, Iterator, Sequence
 import networkx as nx
 import pygraphviz as pgv
 
-from ..commons import Atom, Formula, Term, Predicate, Variable, Not, Theory, _create_term_signatures, global_context, \
-    _are_two_set_of_literals_identical
+# from . import parse
+from ..commons import Atom, Formula, Term, Predicate, Variable, Not, Theory, _create_term_signatures, c_var, \
+    _are_two_set_of_literals_identical, c_pred, c_const, c_atom
 
 
 @dataclass
@@ -222,7 +223,7 @@ class Clause(Formula):
                             cnt += 1
                             alternative_name = alternative_name + f"-{cnt}"
 
-                    var_map[v] = global_context.variable(alternative_name, v.get_type())
+                    var_map[v] = c_var(alternative_name, v.get_type())
 
                 renamed_clauses.append(cl.substitute(var_map))
 
@@ -492,28 +493,6 @@ class ClausalTheory(Theory):
         return sum([len(x)+1 for x in self._formulas])
 
 
-def _convert_to_atom(string: str):
-    pred, args = string.strip().replace(')', '').split('(')
-    args = args.split(',')
-
-    pred = global_context.predicate(pred, len(args))  # Predicate(pred, len(args))
-    # args = [Constant(x) if x.islower() else Variable(x) for x in args]
-    args = [global_context.constant(x) if x.islower() else global_context.variable(x) for x in args]
-
-    return global_context.atom(pred, args)
-
-
-def parse(string: str):
-    if ":-" in string:
-        head, body = string.split(":-")
-        head, body = head.strip(), body.strip()
-        body = [x + ")" for x in body.split("),")]
-        head, body = _convert_to_atom(head), [_convert_to_atom(x) for x in body]
-        return Clause(head, body)
-    else:
-        return _convert_to_atom(string)
-
-
 def are_variables_connected(atoms: Sequence[Atom]):
     """
     Checks whether the Variables in the clause are connected
@@ -538,3 +517,22 @@ def are_variables_connected(atoms: Sequence[Atom]):
     return res
 
 
+def _convert_to_atom(string: str):
+    pred, args = string.strip().replace(')', '').split('(')
+    args = args.split(',')
+
+    pred = c_pred(pred, len(args))
+    args = [c_const(x) if x.islower() else c_var(x) for x in args]
+
+    return c_atom(pred, args)
+
+
+def parse(string: str):
+    if ":-" in string:
+        head, body = string.split(":-")
+        head, body = head.strip(), body.strip()
+        body = [x + ")" for x in body.split("),")]
+        head, body = _convert_to_atom(head), [_convert_to_atom(x) for x in body]
+        return Clause(head, body)
+    else:
+        return _convert_to_atom(string)

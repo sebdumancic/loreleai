@@ -1,5 +1,37 @@
-from .lp import Clause, parse, ClausalTheory, are_variables_connected
-from ..commons import Term, Constant, Variable, Structure, Predicate, Type, Atom, Not, Type, Theory, global_context
+from .lp import Clause, ClausalTheory, are_variables_connected, parse
+from ..commons import (
+    Term,
+    Constant,
+    Variable,
+    Structure,
+    Predicate,
+    Type,
+    Atom,
+    Not,
+    Type,
+    Theory,
+    c_pred,
+    c_const,
+    c_var,
+    c_atom,
+)
 
-__all__ = ['Term', 'Constant', 'Variable', 'Structure', 'Predicate', 'Type', 'Atom', 'Not', 'Type',
-           'Theory', 'Clause',  'parse', 'ClausalTheory', 'are_variables_connected', 'global_context']
+__all__ = [
+    "Term",
+    "Constant",
+    "Variable",
+    "Structure",
+    "Predicate",
+    "Type",
+    "Atom",
+    "Not",
+    "Type",
+    "Theory",
+    "Clause",
+    "ClausalTheory",
+    "are_variables_connected",
+    "c_pred",
+    "c_const",
+    "c_var",
+    "c_atom",
+]
