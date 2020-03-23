@@ -6,8 +6,9 @@ from typing import Set, Dict, List, Tuple, Iterator, Union, Sequence
 
 from ortools.sat.python import cp_model
 
-from loreleai.language.commons import _are_two_set_of_literals_identical, global_context, _create_term_signatures
-from loreleai.language.lp import Clause, Predicate, Atom, Term, ClausalTheory, are_variables_connected, Variable
+from loreleai.language.commons import c_pred, c_literal, Literal, Clause, are_variables_connected, \
+    _are_two_set_of_literals_identical, _create_term_signatures
+from loreleai.language.lp import Predicate, Term, ClausalTheory, Variable
 
 NUM_PREDICATES = 1
 NUM_LITERALS = 2
@@ -80,7 +81,7 @@ class Restructor:
         self.aux_candidate_counter += 1
         return self.aux_candidate_counter
 
-    def __create_latent_clause(self, literals: List[Atom], variable_strategy: int = 1, max_arity: int = 2) -> List[Clause]:
+    def __create_latent_clause(self, literals: List[Literal], variable_strategy: int = 1, max_arity: int = 2) -> List[Clause]:
         if not are_variables_connected(literals):
             # if the variables are not connected in a graph, that makes it an invalid candidate
             return []
@@ -95,9 +96,9 @@ class Restructor:
 
         if variable_strategy == 1 or len(available_vars) == max_arity:
             # take all variables or number of variables is equal to max arity
-            head_pred = global_context.predicate(head_name, len(available_vars), [x.get_type() for x in available_vars])
+            head_pred = c_pred(head_name, len(available_vars), [x.get_type() for x in available_vars])
             # Predicate(head_name, len(available_vars), [x.get_type() for x in available_vars])
-            atom = global_context.atom(head_pred, available_vars)  # Atom(head_pred, available_vars)
+            atom = c_literal(head_pred, available_vars)  # Atom(head_pred, available_vars)
             cl = Clause(atom, literals)
 
             if self.reject_singletons and cl.has_singleton_var():
@@ -111,8 +112,8 @@ class Restructor:
 
             for ind, var_cmb in enumerate(combinations(available_vars, max_arity)):
                 # head_pred = Predicate(f'{head_name}_{ind + 1}', len(var_cmb), [x.get_type() for x in var_cmb])
-                head_pred = global_context.predicate(f'{head_name}_{ind + 1}', len(var_cmb), [x.get_type() for x in var_cmb])
-                atom = global_context.atom(head_pred, list(var_cmb))  # Atom(head_pred, list(var_cmb))
+                head_pred = c_pred(f'{head_name}_{ind + 1}', len(var_cmb), [x.get_type() for x in var_cmb])
+                atom = c_literal(head_pred, list(var_cmb))  # Atom(head_pred, list(var_cmb))
                 cl = Clause(atom, literals)
 
                 if self.reject_singletons and cl.has_singleton_var():
@@ -174,12 +175,12 @@ class Restructor:
                       clauses.get_formulas() if isinstance(clauses, ClausalTheory) else clauses,
                       {})
 
-    def __encode(self, atoms_to_cover: Sequence[Atom],
-                 atoms_covered: Set[Atom],
-                 atom_covering: Dict[Atom, Dict[Clause, Set[Tuple[List[Atom], Dict[Term, Term]]]]],
+    def __encode(self, atoms_to_cover: Sequence[Literal],
+                 atoms_covered: Set[Literal],
+                 atom_covering: Dict[Literal, Dict[Clause, Set[Tuple[List[Literal], Dict[Term, Term]]]]],
                  target_clause_head_vars: Set[Variable],
                  prefix=" ",
-                 allow_partial=False) -> Tuple[Set[Set[Atom]], Set[Clause]]:
+                 allow_partial=False) -> Tuple[Set[Set[Literal]], Set[Clause]]:
         """
         Encoding of a set of atoms
         :param atoms_to_cover:
@@ -324,7 +325,7 @@ class Restructor:
         Identifies all redundancies in possible encodings
 
         Args:
-            encoded_clauses (Dict[Clause, Set[Set[Atom]]]): encoded clauses
+            encoded_clauses (Dict[Clause, Set[Set[Literal]]]): encoded clauses
         """
         self._logger.info(f'Finding redundancies...')
 
@@ -776,7 +777,7 @@ class Restructor:
                 tmp_body = []
                 for atm in frm_itm.get_atoms():
                     if atm.get_predicate() in single_mapping:
-                        tmp_body.append(global_context.atom(single_mapping[atm.get_predicate()], atm.get_terms()))
+                        tmp_body.append(c_literal(single_mapping[atm.get_predicate()], atm.get_terms()))
                     else:
                         tmp_body.append(atm)
 

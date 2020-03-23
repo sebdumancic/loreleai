@@ -5,11 +5,12 @@ from loreleai.learning.restructuring import Restructor
 
 
 class RestructuringMethods:
-
     def candidate_generation(self):
-        clauses = ["t1(X,Y) :- a(X,Y), b(X,Y), c(X)",
-                   "t2(X,Y) :- a(X,Y), b(Y,Z), c(Z)",
-                   "t3(X,Y) :- b(X,Z), d(X, Y), c(X)"]
+        clauses = [
+            "t1(X,Y) :- a(X,Y), b(X,Y), c(X)",
+            "t2(X,Y) :- a(X,Y), b(Y,Z), c(Z)",
+            "t3(X,Y) :- b(X,Z), d(X, Y), c(X)",
+        ]
 
         clauses = [parse(x) for x in clauses]
         theory = ClausalTheory(clauses)
@@ -43,9 +44,11 @@ class RestructuringMethods:
         assert len(cands[clauses[0]]) == 3
 
     def restructuring_encoding_theory(self):
-        clauses = ["t1(X,Y) :- a(X,Y), b(X,Y), c(X)",
-                   "t2(X,Y) :- a(X,Y), b(Y,Z), c(Z)",
-                   "t3(X,Y) :- b(X,Z), d(X,Y), c(X)"]
+        clauses = [
+            "t1(X,Y) :- a(X,Y), b(X,Y), c(X)",
+            "t2(X,Y) :- a(X,Y), b(Y,Z), c(Z)",
+            "t3(X,Y) :- b(X,Z), d(X,Y), c(X)",
+        ]
         clauses = [parse(x) for x in clauses]
         theory = ClausalTheory(clauses)
 
@@ -65,9 +68,11 @@ class RestructuringMethods:
         assert len(distinct_candidates) == 7
 
     def restructuring_no_redundancy(self):
-        clauses = ["t1(X,Y) :- a(X,Y), b(X,Y), c(X)",
-                   "t2(X,Y) :- a(X,Y), b(Y,Z), c(Z)",
-                   "t3(X,Y) :- b(X,Z), d(X,Y), c(X)"]
+        clauses = [
+            "t1(X,Y) :- a(X,Y), b(X,Y), c(X)",
+            "t2(X,Y) :- a(X,Y), b(Y,Z), c(Z)",
+            "t3(X,Y) :- b(X,Z), d(X,Y), c(X)",
+        ]
 
         clauses = [parse(x) for x in clauses]
         theory = ClausalTheory(clauses)
@@ -81,9 +86,11 @@ class RestructuringMethods:
         assert len(redunds) == 0
 
     def restructuring_redundancy(self):
-        clauses = ["t1(X,Y) :- a(X,Y), b(X,Y), c(X)",
-                   "t2(X,Y) :- a(X,Y), b(Y,Z), c(Z)",
-                   "t3(X,Y) :- a(X,Y), b(X,Y), d(X,Z), c(X)"]
+        clauses = [
+            "t1(X,Y) :- a(X,Y), b(X,Y), c(X)",
+            "t2(X,Y) :- a(X,Y), b(Y,Z), c(Z)",
+            "t3(X,Y) :- a(X,Y), b(X,Y), d(X,Z), c(X)",
+        ]
 
         clauses = [parse(x) for x in clauses]
         theory = ClausalTheory(clauses)
@@ -95,10 +102,15 @@ class RestructuringMethods:
 
         redunds, _ = restruct._find_redundancies(cands)
 
-        assert len(redunds) == 3
+        # for k, v in redunds.items():
+        #     print(k, v)
+
+        assert len(redunds) == 4
 
     def restructuring_unfold(self):
-        theory_file = os.path.dirname(__file__) + "/../data/restructuring/robots_example.pl"
+        theory_file = (
+            os.path.dirname(__file__) + "/../data/restructuring/robots_example.pl"
+        )
         theory = ClausalTheory(read_from_file=theory_file)
 
         unfolded_theory = theory.unfold()
@@ -116,3 +128,5 @@ def test_restructuring():
     test.restructuring_redundancy()
     test.restructuring_unfold()
 
+
+# test_restructuring()

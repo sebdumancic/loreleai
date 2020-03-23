@@ -1,4 +1,4 @@
-from .lp import Clause, ClausalTheory, are_variables_connected, parse
+from .lp import ClausalTheory, parse
 from ..commons import (
     Term,
     Constant,
@@ -6,14 +6,17 @@ from ..commons import (
     Structure,
     Predicate,
     Type,
-    Atom,
     Not,
     Type,
     Theory,
     c_pred,
     c_const,
+    c_id_to_const,
     c_var,
-    c_atom,
+    c_literal,
+    Literal,
+    Clause,
+    are_variables_connected
 )
 
 __all__ = [
@@ -23,15 +26,16 @@ __all__ = [
     "Structure",
     "Predicate",
     "Type",
-    "Atom",
     "Not",
     "Type",
     "Theory",
-    "Clause",
     "ClausalTheory",
-    "are_variables_connected",
     "c_pred",
     "c_const",
+    "c_id_to_const",
     "c_var",
-    "c_atom",
+    "c_literal",
+    "Clause",
+    "Literal",
+    "are_variables_connected"
 ]
