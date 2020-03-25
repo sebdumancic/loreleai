@@ -21,7 +21,7 @@ Working towards the support:
  - [pyDatalog](https://sites.google.com/site/pydatalog/home)
  - [Pyrolog](https://bitbucket.org/cfbolz/pyrolog/src/default/)
  - [sPyrolog](https://github.com/leonweber/spyrolog)  (makes Pyrolog redundant?)
- - miniKanren: [logpy](https://github.com/logpy/logpy) or [microkanren](https://github.com/ethframe/microkanren); potentially useful resource [link](https://stackoverflow.com/questions/11291242/python-dynamically-create-function-at-runtime)
+ - miniKanren: [logpy](https://github.com/logpy/logpy) or [microkanren](https://github.com/ethframe/microkanren) or [umanreknpy](https://microkanrenpy.readthedocs.io/en/latest/index.html); potentially useful resource [link](https://stackoverflow.com/questions/11291242/python-dynamically-create-function-at-runtime)
  - an actual SWI Prolog wrapper (to be made from scratch)
  - [Grakn](https://grakn.ai/)
  
