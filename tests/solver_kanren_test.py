@@ -1,8 +1,8 @@
-from loreleai.language.lp import c_const, c_var, c_pred
-from loreleai.reasoning.lp.datalog import MuZ
+from loreleai.language.kanren import c_var, c_pred, c_const
+from loreleai.reasoning.lp.kanren import MiniKanren
 
 
-class DatalogTests:
+class KanrenTest:
 
     def simple_grandparent(self):
         p1 = c_const("p1")
@@ -19,9 +19,9 @@ class DatalogTests:
         v2 = c_var("Y")
         v3 = c_var("Z")
 
-        cl = (grandparent(v1, v3) <= parent(v1, v2) & parent(v2, v3))
+        cl = grandparent(v1, v3) <= parent(v1, v2) & parent(v2, v3)
 
-        solver = MuZ()
+        solver = MiniKanren()
 
         solver.assert_fact(f1)
         solver.assert_fact(f2)
@@ -69,16 +69,15 @@ class DatalogTests:
         Z = c_var("Z")
 
         cl1 = path(X, Y) <= edge(X, Y)
-        cl2 = path(X, Y) <= path(X, Z) & edge(Z, Y)
+        cl2 = path(X, Y) <= edge(X, Z) & path(Z, Y)
 
-        solver = MuZ()
+        solver = MiniKanren()
 
         solver.assert_fact(f1)
         solver.assert_fact(f2)
         solver.assert_fact(f3)
 
-        solver.assert_rule(cl1)
-        solver.assert_rule(cl2)
+        solver.assert_rule([cl1, cl2])
 
         assert solver.has_solution(path(v1, v2))
         assert solver.has_solution(path(v1, v4))
@@ -92,10 +91,10 @@ class DatalogTests:
         assert len(solver.all_solutions(path(X, Y))) == 4
 
 
-def test_datalog():
-    dtest = DatalogTests()
+def test_kanren():
+    test = KanrenTest()
 
-    dtest.simple_grandparent()
-    dtest.graph_connectivity()
+    test.simple_grandparent()
+    test.graph_connectivity()
 
-test_datalog()
+test_kanren()

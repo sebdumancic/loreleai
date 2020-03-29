@@ -25,7 +25,7 @@ from loreleai.language.lp import (
     c_id_to_const,
 )
 from loreleai.language.utils import MUZ
-from loreleai.reasoning.lp.datalog import DatalogSolver
+from .datalogsolver import DatalogSolver
 
 
 class MuZ(DatalogSolver):

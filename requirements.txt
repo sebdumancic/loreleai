@@ -7,3 +7,4 @@ black
 matplotlib
 pygraphviz
 z3-solver
+miniKanren

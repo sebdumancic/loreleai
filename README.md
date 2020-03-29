@@ -21,7 +21,7 @@ Working towards the support:
  - [pyDatalog](https://sites.google.com/site/pydatalog/home)
  - [Pyrolog](https://bitbucket.org/cfbolz/pyrolog/src/default/)
  - [sPyrolog](https://github.com/leonweber/spyrolog)  (makes Pyrolog redundant?)
- - miniKanren: [logpy](https://github.com/logpy/logpy) or [microkanren](https://github.com/ethframe/microkanren) or [umanreknpy](https://microkanrenpy.readthedocs.io/en/latest/index.html); potentially useful resource [link](https://stackoverflow.com/questions/11291242/python-dynamically-create-function-at-runtime)
+ - miniKanren: [minikanren](https://github.com/brandonwillard/kanren), [logpy](https://github.com/logpy/logpy) or [microkanren](https://github.com/ethframe/microkanren) or [umanreknpy](https://microkanrenpy.readthedocs.io/en/latest/index.html); potentially useful resource [link](https://stackoverflow.com/questions/11291242/python-dynamically-create-function-at-runtime)
  - an actual SWI Prolog wrapper (to be made from scratch)
  - [Grakn](https://grakn.ai/)
  
@@ -39,3 +39,7 @@ For using SWI prolog, check the install instructions: https://github.com/yuce/py
 ## Z3
 
 Z3Py scripts stored in arbitrary directories can be executed if the 'build/python' directory is added to the PYTHONPATH environment variable and the 'build' directory is added to the DYLD_LIBRARY_PATH environment variable.
+
+## microkanren
+
+clone [this](https://github.com/ethframe/microkanren) repo and do 'pip install <path_to_the_repo>'

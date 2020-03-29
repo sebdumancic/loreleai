@@ -3,10 +3,11 @@ from functools import reduce
 from itertools import combinations, product
 from typing import Dict, List, Tuple, Sequence, Set, Union, Iterator
 
+import kanren
 import networkx as nx
 import z3
 
-from .utils import MUZ, LP, FOL
+from .utils import MUZ, LP, FOL, KANREN_LOGPY
 
 
 class Type:
@@ -28,11 +29,14 @@ class Type:
             raise Exception(f"unknown Type object {type(elem)}")
 
     def get_engine_obj(self, eng):
-        assert eng in [MUZ]
+        assert eng in [MUZ, KANREN_LOGPY]
         return self._engine_objects[eng]
 
     def as_muz(self):
         return self._engine_objects[MUZ]
+
+    def as_kanren(self):
+        raise Exception("types not supported in kanren")
 
     def __add__(self, other):
         self.add(other)
@@ -101,8 +105,14 @@ class Term:
         """
         return self._engine_objects[MUZ]
 
+    def as_kanren(self):
+        """
+        Returns the object's representation in the miniKanren engine
+        """
+        return self._engine_objects[KANREN_LOGPY]
+
     def get_engine_obj(self, eng):
-        assert eng in [MUZ]
+        assert eng in [MUZ, KANREN_LOGPY]
         return self._engine_objects[eng]
 
     def __eq__(self, other):
@@ -140,6 +150,8 @@ class Constant(Term):
     def add_engine_object(self, elem):
         if z3.is_bv_value(elem):
             self._engine_objects[MUZ] = elem
+        elif isinstance(elem, str):
+            self._engine_objects[KANREN_LOGPY] = elem
         else:
             raise Exception(f"unsupported Constant object {type(elem)}")
 
@@ -169,6 +181,8 @@ class Variable(Term):
     def add_engine_object(self, elem):
         if z3.is_expr(elem):
             self._engine_objects[MUZ] = elem
+        elif isinstance(elem, kanren.Var):
+            self._engine_objects[KANREN_LOGPY] = elem
         else:
             raise Exception(f"unsupported Variable object: {type(elem)}")
 
@@ -237,17 +251,26 @@ class Predicate:
         return self.name, self.get_arity()
 
     def add_engine_object(self, elem):
-        if z3.is_func_decl(elem):
+        if isinstance(elem, tuple):
+            # add object as (engine name, object)
+            assert elem[0] in [MUZ, KANREN_LOGPY]
+            self._engine_objects[elem[0]] = elem[1]
+        elif z3.is_func_decl(elem):
             self._engine_objects[MUZ] = elem
+        elif isinstance(elem, kanren.Relation):
+            self._engine_objects[KANREN_LOGPY] = elem
         else:
             raise Exception(f"unsupported Predicate object {type(elem)}")
 
     def get_engine_obj(self, eng):
-        assert eng in [MUZ]
+        assert eng in [MUZ, KANREN_LOGPY]
         return self._engine_objects[eng]
 
     def as_muz(self):
         return self._engine_objects[MUZ]
+
+    def as_kanren(self):
+        return self._engine_objects[KANREN_LOGPY]
 
     def __eq__(self, other):
         if isinstance(self, type(other)):
@@ -314,6 +337,9 @@ class Formula:
     def as_muz(self):
         raise NotImplementedError()
 
+    def as_kanren(self, base_case_recursion=None):
+        raise NotImplementedError()
+
     def __hash__(self):
         if self._hash_cache is None:
             self._hash_cache = hash(self.__repr__())
@@ -344,6 +370,9 @@ class Not(Formula):
 
     def as_muz(self):
         return z3.Not(self.formula.as_muz())
+
+    def as_kanren(self, base_case_recursion=None):
+        raise Exception("miniKanren does not support negation")
 
     def __hash__(self):
         if self._hash_cache is None:
@@ -381,6 +410,11 @@ class Literal(Formula):
     def as_muz(self):
         args = [x.as_muz() for x in self.arguments]
         return self.predicate.as_muz()(*args)
+
+    def as_kanren(self, base_case_recursion=None):
+        # not used here, provides base cases forthe recursion
+        args = [x.as_kanren() for x in self.arguments]
+        return self.predicate.as_kanren()(*args)
 
     def __repr__(self):
         return "{}({})".format(
@@ -444,12 +478,12 @@ class Clause(Formula):
 
     def __init__(self, head: Literal, body: Union[List[Literal], Body]):
         super(Clause, self).__init__()
-        self._head = head
+        self._head: Literal = head
 
         if isinstance(body, Body):
-            self._body = body.get_literals()
+            self._body: Sequence[Literal] = body.get_literals()
         else:
-            self._body = body
+            self._body: Sequence[Literal] = body
         self._body = self._get_atom_order()
         self._terms = set()
         self._repr_cache = None
@@ -717,6 +751,35 @@ class Clause(Formula):
     def as_muz(self):
         return self._head.as_muz(), [x.as_muz() for x in self._body]
 
+    def as_kanren(self, base_case_recursion=None):
+        if self.is_recursive():
+            raise Exception(f"recursive rules should not be constructed with .as_kanren() method but should use 'construct_recursive' from kanren package")
+        # Should associate a conj goal with the predicate in the head
+        # has to be a function
+        # rename all variables to make sure there are no strange effects
+
+        # head vars need to be bound to input args of the function
+        head_vars = dict([(x, ind) for ind, x in enumerate(self._head.get_variables())])
+
+        # all other arguments need to be bound to their kanren constructs
+        other_args = [x.get_terms() for x in self._body]
+        other_args = set(reduce(lambda x, y: x + y, other_args, []))
+        # remove head variables; these should be bounded to the function arguments
+        other_args = [x for x in other_args if x not in head_vars]
+
+        def generic_predicate(*args, core_obj=self, hvars=head_vars, ovars=other_args):
+            vars_to_use = dict([(v, kanren.var()) for v in ovars])
+            return kanren.conde(
+                [x.get_predicate().as_kanren()(
+                    *[args[hvars[y]] if y in hvars else vars_to_use[y] for y in x.get_terms()]
+                )
+                 for x in core_obj.get_atoms()]
+            )
+
+        return generic_predicate
+
+
+
     def __contains__(self, item):
         if isinstance(item, Predicate):
             return item.get_name() in map(lambda x: x.predicate.name, self._body)
@@ -905,15 +968,14 @@ class Context:
     def variable(self, name, domain=None) -> Variable:
         if domain is None:
             domain = "thing"
+        elif isinstance(domain, Type):
+            domain = domain.name
 
         if domain not in self._variables:
             self._variables[domain] = {}
 
         if name not in self._variables[domain]:
-            if isinstance(domain, str):
-                v = Variable(name, sym_type=self._domains[domain])
-            else:
-                v = Variable(name, sym_type=domain)
+            v = Variable(name, sym_type=self._domains[domain])
             self._variables[domain][name] = v
 
         return self._variables[domain][name]
@@ -921,6 +983,8 @@ class Context:
     def constant(self, name, domain=None) -> Constant:
         if domain is None:
             domain = "thing"
+        elif isinstance(domain, Type):
+            domain = domain.name
 
         if domain not in self._id_to_constant:
             self._id_to_constant[domain] = {}
@@ -929,10 +993,7 @@ class Context:
             self._constants[domain] = {}
 
         if name not in self._constants[domain]:
-            if isinstance(domain, Type):
-                c = Constant(name, domain)
-            else:
-                c = Constant(name, self._domains[domain])
+            c = Constant(name, self._domains[domain])
             self._constants[domain][name] = c
             self._id_to_constant[domain][c.id()] = c
 
