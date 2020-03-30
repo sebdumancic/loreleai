@@ -92,6 +92,7 @@ Considering:
    - [clorm](https://github.com/potassco/clorm)
    - [asp-lite](https://github.com/lorenzleutgeb/asp-lite)
    - [hexlite](https://github.com/hexhex/hexlite)
+   - [clyngor](https://github.com/aluriak/clyngor)
 
 
 # Roadmap
