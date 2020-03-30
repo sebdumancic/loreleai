@@ -41,7 +41,7 @@ solver.one_solution(grandparent(p1, V1))# ask for a single solution
 
 # Supported reasoning engines
 
-## Prolog
+### Prolog
 
 Currently supported:
  - none yet
@@ -53,7 +53,7 @@ Considering:
  - an actual SWI Prolog wrapper (to be made from scratch)
  
 
-## Relational programming
+### Relational programming
 Prolog without side-effects (cut and so on)
 
 Currently supported:
@@ -64,7 +64,7 @@ Considering:
  - [microkanren](https://github.com/ethframe/microkanren)
  - [microkanrenpy](https://microkanrenpy.readthedocs.io/en/latest/index.html)
  
-## Datalog
+### Datalog
 A subset of Prolog without functors/structures
 
 Currently supported:
@@ -73,25 +73,60 @@ Currently supported:
 Considering:
  - [pyDatalog](https://sites.google.com/site/pydatalog/home)
  
-## Deductive databases
+### Deductive databases
 
 Currently supported:
  - none yet
  
 Considering:
  - [Grakn](https://grakn.ai/)
+ 
+ 
+### Answer set programming
+
+Currently supported:
+  - none yet
+  
+Considering:
+   - [aspirin](https://github.com/potassco/asprin)
+   - [clorm](https://github.com/potassco/clorm)
+   - [asp-lite](https://github.com/lorenzleutgeb/asp-lite)
+   - [hexlite](https://github.com/hexhex/hexlite)
 
 
 # Roadmap
 
-## First direction: reasoning engines
+### First direction: reasoning engines
+
+ - integrate one solver for each of the representative categories
+ - add support for external predicates (functionality specified in Python)
+ - SWI prolog wrapper
+ - include probabilistic engines (Problog, PSL, MLNs)
+ - add parsers for each dialect
+ - different ways of loading data (input language, CSV, ...)
+ 
 
 
-## Second directions: learning primitives
+### Second directions: learning primitives
 
-Other features:
- - ILP learners
- - 
+ - add learning primitives such as search, hypothesis space generation
+ - wrap state of the art learners (ACE, Metagol, Aleph)
+ 
+ 
+# Code structure
+
+The *language* constructs are in `loreleai/language` folder. 
+There is a folder for each dialect of first-order logic.
+Currently there are _logic programming_ (`loreleai/language/lp`) and _relational programming_ (`loreleai/language/kanren`).
+The implementations of all shared concepts are in `loreleai/language/commons.py` and the idea is to use `__init__.py` files to provide the allowed constructs for each dialect.
+
+
+The *reasoning* constructs are in `loreleai/reasoning` folder.
+The structure is the same as with language. 
+Different dialects of logic programming are in the folder `lorelai/reasoning/lp`.
+
+
+The *learning* primitives are supposed to be in the `loreleai/learning` folder.
 
 
 
