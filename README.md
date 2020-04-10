@@ -50,8 +50,10 @@ Considering:
  - primitive [SWI Prolog](https://www.swi-prolog.org/) commandline interface
  - [Pyrolog](https://bitbucket.org/cfbolz/pyrolog/src/default/)
  - [sPyrolog](https://github.com/leonweber/spyrolog)  (makes Pyrolog redundant?)
- - an actual SWI Prolog wrapper (to be made from scratch)
- 
+ - an actual SWI Prolog wrapper (to be made from scratch) [link1](https://www.swi-prolog.org/pldoc/man?section=calling-prolog-from-c) [link2](https://www.swi-prolog.org/pldoc/doc_for?object=section(%27packages/pl2cpp.html%27))
+ - [Ciao prolog](https://ciao-lang.org/); support for foreign functions is better explained [link](https://ciao-lang.org/ciao/build/doc/ciao.html/foreign_interface_doc.html)
+ - wrap around existing Java interfaces through Jython?
+ - [composition of interpreters](https://soft-dev.org/pubs/html/barrett_bolz_tratt__approaches_to_interpreter_composition/) 
 
 ### Relational programming
 Prolog without side-effects (cut and so on)
