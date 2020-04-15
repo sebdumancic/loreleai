@@ -297,10 +297,22 @@ class Predicate:
             self.hash_cache = hash(self.__repr__())
         return self.hash_cache
 
+    def _map_to_object(self, name: str, arg_position: int) -> Union[Constant, Variable, Structure]:
+        if '(' in name:
+            raise Exception("automatically converting to structure not yet supported")
+        elif name.islower():
+            return c_const(name, self.argument_types[arg_position])
+        elif name.isupper():
+            return c_var(name, self.argument_types[arg_position])
+        else:
+            raise Exception(f"don't know how to parse {name} to object")
+
     def __call__(self, *args, **kwargs):
         assert len(args) == self.get_arity()
-        assert all([isinstance(x, (Constant, Variable, Structure)) for x in args])
+        assert all([isinstance(x, (Constant, Variable, Structure, str)) for x in args])
         global global_context
+
+        args = [x if isinstance(x, (Constant, Variable, Structure)) else self._map_to_object(x, ind) for ind, x in enumerate(args)]
 
         if global_context.get_logic() == LP:
             return Literal(self, list(args))

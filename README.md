@@ -36,7 +36,19 @@ solver.assert_rule(cl)                  # assert a rule
 solver.has_solution(grandparent(p1, p3))# ask whether there is a solution to a query
 solver.all_solutions(parent(V1, V2))    # ask for all solutions
 solver.one_solution(grandparent(p1, V1))# ask for a single solution
+```
 
+Alternatively, `Loreleai` provides shortcuts to defining facts
+```python
+from loreleai.language.lp import  c_pred
+
+parent = c_pred("parent", 2)            # create a predicate/relation 'parent'
+grandparent = c_pred("grandparent", 2)
+
+f1 = parent("p1", "p2")                 # 'p1' and 'p2' are automatically parsed into a Constant
+f2 = parent("p2", "p3")
+
+query_literal = grandparent("p1", "X")  # 'X' is automatically parsed into a Variable
 ```
 
 # Supported reasoning engines
