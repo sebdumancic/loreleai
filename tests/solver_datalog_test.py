@@ -98,4 +98,6 @@ def test_datalog():
     dtest.simple_grandparent()
     dtest.graph_connectivity()
 
+    print("all tests done!")
+
 test_datalog()

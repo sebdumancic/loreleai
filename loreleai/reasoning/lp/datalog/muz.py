@@ -14,17 +14,17 @@ from z3 import (
     is_false,
 )
 
+from loreleai.language import MUZ
 from loreleai.language.commons import Context
-from loreleai.language.lp import (
+from loreleai.language.datalog import (
     Type,
     Constant,
     Variable,
     Predicate,
-    Literal,
+    Atom,
     Clause,
-    c_id_to_const,
+    c_id_to_const
 )
-from loreleai.language.utils import MUZ
 from .datalogsolver import DatalogSolver
 
 
@@ -71,14 +71,14 @@ class MuZ(DatalogSolver):
         self._solver.register_relation(rel)
         elem_predicate.add_engine_object(rel)
 
-    def assert_fact(self, fact: Literal):
+    def assert_fact(self, fact: Atom):
         self._solver.fact(fact.as_muz())
 
     def assert_rule(self, rule: Clause):
         cl_muz = rule.as_muz()
         self._solver.rule(cl_muz[0], cl_muz[1])
 
-    def has_solution(self, query: Union[Literal, Clause]) -> bool:
+    def has_solution(self, query: Union[Atom, Clause]) -> bool:
         """
         Checks whether a query has a solution
 
@@ -89,7 +89,7 @@ class MuZ(DatalogSolver):
             True if there is a solution, False is no
 
         """
-        if isinstance(query, Literal):
+        if isinstance(query, Atom):
             q = query.as_muz()
             res = self._solver.query(q)
             return True if res.r == 1 else False
@@ -100,7 +100,7 @@ class MuZ(DatalogSolver):
         else:
             raise Exception(f"Cannot query {type(query)}")
 
-    def one_solution(self, query: Union[Literal, Clause]) -> Dict[Variable, Constant]:
+    def one_solution(self, query: Union[Atom, Clause]) -> Dict[Variable, Constant]:
         """
         Returns one (random) solution to the query
 
@@ -110,8 +110,8 @@ class MuZ(DatalogSolver):
         Return:
             dict (Dict[Variable,Constant]) mapping the variables in the query to constaints
         """
-        if isinstance(query, (Literal, Clause)):
-            if isinstance(query, Literal):
+        if isinstance(query, (Atom, Clause)):
+            if isinstance(query, Atom):
                 self._solver.query(query.as_muz())
             else:
                 body_atms = [x.as_muz() for x in query.get_atoms()]
@@ -146,13 +146,13 @@ class MuZ(DatalogSolver):
 
             ans = [int(x.children()[1].as_long()) for x in ans.children()]
 
-            if isinstance(query, Literal):
+            if isinstance(query, Atom):
                 args = query.get_variables()
             else:
                 tmp_args = [v for x in query.get_atoms() for v in x.get_variables()]
                 args = reduce(lambda x, y: x + [y] if y not in x else x, tmp_args, [])
 
-            if isinstance(query, Literal):
+            if isinstance(query, Atom):
                 return dict(
                     [
                         (v, c_id_to_const(c, v.get_type().name))
@@ -172,7 +172,7 @@ class MuZ(DatalogSolver):
             raise Exception(f"Cannot query {type(query)}")
 
     def all_solutions(
-        self, query: Union[Literal, Clause]
+        self, query: Union[Atom, Clause]
     ) -> Sequence[Dict[Variable, Constant]]:
         """
         Returns all solutions to the query
@@ -183,8 +183,8 @@ class MuZ(DatalogSolver):
         Return:
             sequence of dict (Dict[Variable,Constant]) mapping the variables in the query to constants
         """
-        if isinstance(query, (Literal, Clause)):
-            if isinstance(query, Literal):
+        if isinstance(query, (Atom, Clause)):
+            if isinstance(query, Atom):
                 self._solver.query(query.as_muz())
             else:
                 body_atms = [x.as_muz() for x in query.get_atoms()]
@@ -224,13 +224,13 @@ class MuZ(DatalogSolver):
             else:
                 raise Exception(f"don't know how to parse {ans}")
 
-            if isinstance(query, Literal):
+            if isinstance(query, Atom):
                 args = query.get_variables()
             else:
                 tmp_args = [v for x in query.get_atoms() for v in x.get_variables()]
                 args = reduce(lambda x, y: x + [y] if y not in x else x, tmp_args, [])
 
-            if isinstance(query, Literal):
+            if isinstance(query, Atom):
                 return [
                     dict(
                         [

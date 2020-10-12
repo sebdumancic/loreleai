@@ -13,9 +13,10 @@ from ..commons import (
     c_id_to_const,
     c_var,
     c_literal,
-    Literal,
+    Atom,
     Clause,
-    are_variables_connected
+    are_variables_connected,
+    Literal
 )
 from ..lp import ClausalTheory
 
@@ -36,6 +37,7 @@ __all__ = [
     "c_var",
     "c_literal",
     "Clause",
-    "Literal",
-    "are_variables_connected"
+    "Atom",
+    "are_variables_connected",
+    "Literal"
 ]

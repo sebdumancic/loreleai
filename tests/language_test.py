@@ -1,4 +1,4 @@
-from loreleai.language.lp import c_var, c_pred, c_const, Predicate, Constant, Variable, Clause, Literal
+from loreleai.language.lp import c_var, c_pred, c_const, Predicate, Constant, Variable, Clause, Atom
 
 
 class LanguageTest:
@@ -33,8 +33,8 @@ class LanguageTest:
 
         assert isinstance(cl, Clause)
 
-        assert isinstance(f1, Literal)
-        assert isinstance(f2, Literal)
+        assert isinstance(f1, Atom)
+        assert isinstance(f2, Atom)
 
     def shorthand_constructs(self):
         parent = c_pred("parent", 2)
@@ -47,9 +47,9 @@ class LanguageTest:
         assert isinstance(parent, Predicate)
         assert isinstance(grandparent, Predicate)
 
-        assert isinstance(f1, Literal)
-        assert isinstance(f2, Literal)
-        assert isinstance(f3, Literal)
+        assert isinstance(f1, Atom)
+        assert isinstance(f2, Atom)
+        assert isinstance(f3, Atom)
 
         assert isinstance(f1.arguments[0], Constant)
         assert isinstance(f1.arguments[1], Constant)

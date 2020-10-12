@@ -97,4 +97,6 @@ def test_kanren():
     test.simple_grandparent()
     test.graph_connectivity()
 
+    print("all tests done!")
+
 test_kanren()

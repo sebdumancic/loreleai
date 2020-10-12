@@ -1,6 +1,6 @@
 from typing import Dict, Sequence, Union
 
-from loreleai.language.commons import Literal, Clause, Context, global_context
+from loreleai.language.commons import Atom, Clause, Context, global_context
 from loreleai.language.lp import Predicate, Type, Constant, Variable
 
 
@@ -85,7 +85,7 @@ class LPSolver:
         """
         raise NotImplementedError()
 
-    def assert_fact(self, fact: Literal) -> None:
+    def assert_fact(self, fact: Atom) -> None:
         """
         Asserts fact to the solvers knowledge base
 
@@ -103,7 +103,7 @@ class LPSolver:
         """
         raise NotImplementedError()
 
-    def has_solution(self, query: Union[Literal, Clause]) -> bool:
+    def has_solution(self, query: Union[Atom, Clause]) -> bool:
         """
         Checks whether the query can be satisfied by the knowledge base
 
@@ -115,7 +115,7 @@ class LPSolver:
         """
         raise NotImplementedError()
 
-    def one_solution(self, query: Union[Literal, Clause]) -> Dict[Variable, Constant]:
+    def one_solution(self, query: Union[Atom, Clause]) -> Dict[Variable, Constant]:
         """
         Returns one (random) solution to the query
 
@@ -127,7 +127,7 @@ class LPSolver:
         """
         raise NotImplementedError()
 
-    def all_solutions(self, query: Union[Literal, Clause]) -> Sequence[Dict[Variable, Constant]]:
+    def all_solutions(self, query: Union[Atom, Clause]) -> Sequence[Dict[Variable, Constant]]:
         """
         Returns all solutions to the query
 
