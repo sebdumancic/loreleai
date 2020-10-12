@@ -2,9 +2,9 @@ from typing import Union, Dict, Sequence, Tuple
 
 import kanren
 
-from loreleai.language.kanren import Constant, Type, Variable, Predicate, Literal, Clause, c_const, \
+from loreleai.language import KANREN_LOGPY
+from loreleai.language.kanren import Constant, Type, Variable, Predicate, Atom, Clause, c_const, \
     construct_recursive_rule
-from loreleai.language.utils import KANREN_LOGPY
 from ..lpsolver import LPSolver
 
 
@@ -29,7 +29,7 @@ class MiniKanren(LPSolver):
         #     predicates used as facts need to be declared as
         pass
 
-    def assert_fact(self, fact: Literal) -> None:
+    def assert_fact(self, fact: Atom) -> None:
         try:
             fact.get_predicate().get_engine_obj(KANREN_LOGPY)
         except Exception:
@@ -53,8 +53,8 @@ class MiniKanren(LPSolver):
 
             rule[0].get_head().get_predicate().add_engine_object((KANREN_LOGPY, obj))
 
-    def _query(self, query: Union[Literal, Clause], num_sols=1) -> Tuple[Sequence[Sequence[str]], Sequence[Variable]]:
-        if isinstance(query, Literal):
+    def _query(self, query: Union[Atom, Clause], num_sols=1) -> Tuple[Sequence[Sequence[str]], Sequence[Variable]]:
+        if isinstance(query, Atom):
             vars = [x.as_kanren() for x in query.get_variables()]
             ori_vars = [x for x in query.get_variables()]
             if len(vars) == 0:
@@ -64,22 +64,22 @@ class MiniKanren(LPSolver):
             vars = [x.as_kanren() for x in query.get_head().get_variables()]
             ori_vars = [x for x in query.get_head().get_variables()]
 
-        if isinstance(query, Literal):
+        if isinstance(query, Atom):
             goals = [query.as_kanren()]
         else:
             goals = [x.as_kanren() for x in query.get_atoms()]
 
         return kanren.run(num_sols, vars, *goals), ori_vars
 
-    def has_solution(self, query: Union[Literal, Clause]) -> bool:
-        if isinstance(query, (Literal, Clause)):
+    def has_solution(self, query: Union[Atom, Clause]) -> bool:
+        if isinstance(query, (Atom, Clause)):
             res, _ = self._query(query, num_sols=1)
 
             return True if res else False
         else:
             raise Exception(f"cannot query {type(query)}")
 
-    def one_solution(self, query: Union[Literal, Clause]) -> Dict[Variable, Constant]:
+    def one_solution(self, query: Union[Atom, Clause]) -> Dict[Variable, Constant]:
         res, vars = self._query(query, num_sols=1)
 
         if len(res) == 0:
@@ -87,7 +87,7 @@ class MiniKanren(LPSolver):
 
         return dict(zip(vars, [c_const(x, vars[ind].get_type()) for ind, x in enumerate(res[0])]))
 
-    def all_solutions(self, query: Union[Literal, Clause]) -> Sequence[Dict[Variable, Constant]]:
+    def all_solutions(self, query: Union[Atom, Clause]) -> Sequence[Dict[Variable, Constant]]:
         res, vars = self._query(query, num_sols=0)
 
         if len(res) == 0:
