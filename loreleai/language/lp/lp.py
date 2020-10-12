@@ -26,7 +26,7 @@ class ClausalTheory(Theory):
 
         super(ClausalTheory, self).__init__(formulas)
 
-    def get_formulas(self, predicates: Set[Predicate] = None) -> Sequence[Clause]:
+    def get_clauses(self, predicates: Set[Predicate] = None) -> Sequence[Clause]:
         if predicates:
             return [x for x in self._formulas if any([p in predicates for p in x.get_predicates()])]
         else:
@@ -131,7 +131,7 @@ class ClausalTheory(Theory):
         # excluding recursively defined predicates from the candidate set, so that they are not used
         clause_index = dict([(k, v) for k, v in clause_index.items() if k not in recursively_defined_predicates])
 
-        for cl in self.get_formulas():
+        for cl in self.get_clauses():
             if cl in clauses_to_exclude:
                 continue
 

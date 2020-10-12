@@ -16,7 +16,10 @@ from ..commons import (
     Atom,
     Clause,
     are_variables_connected,
-    Literal
+    Literal,
+    Procedure,
+    Disjunction,
+    Recursion
 )
 from ..lp import ClausalTheory
 
@@ -39,5 +42,8 @@ __all__ = [
     "Clause",
     "Atom",
     "are_variables_connected",
-    "Literal"
+    "Literal",
+    "Procedure",
+    "Disjunction",
+    "Recursion"
 ]

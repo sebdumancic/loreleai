@@ -14,10 +14,18 @@ from ..commons import (
     c_id_to_const,
     c_var,
     c_literal,
-    Literal,
+    Atom,
     Clause,
-    are_variables_connected
+    are_variables_connected,
+    c_fresh_var,
+    Literal,
+    Procedure,
+    Disjunction,
+    Recursion
 )
+
+from ..utils import triplet
+
 
 __all__ = [
     "Term",
@@ -36,6 +44,12 @@ __all__ = [
     "c_var",
     "c_literal",
     "Clause",
-    "Literal",
-    "are_variables_connected"
+    "Atom",
+    "are_variables_connected",
+    "c_fresh_var",
+    'triplet',
+    'Literal',
+    'Procedure',
+    "Disjunction",
+    "Recursion"
 ]
