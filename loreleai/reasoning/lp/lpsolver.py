@@ -1,7 +1,7 @@
-from typing import Dict, Sequence, Union
+from typing import Union
 
 from loreleai.language.commons import Atom, Clause, Context, global_context
-from loreleai.language.lp import Predicate, Type, Constant, Variable
+from loreleai.language.lp import Predicate, Type, Constant, Variable, Not
 
 
 class LPSolver:
@@ -103,39 +103,63 @@ class LPSolver:
         """
         raise NotImplementedError()
 
-    def has_solution(self, query: Union[Atom, Clause]) -> bool:
-        """
-        Checks whether the query can be satisfied by the knowledge base
+    # def has_solution(self, query: Union[Atom, Clause]) -> bool:
+    #     """
+    #     Checks whether the query can be satisfied by the knowledge base
+    #
+    #     Arguments:
+    #         query (Union[Atom,Clause]): query to check
+    #
+    #     Return:
+    #         True/False
+    #     """
+    #     raise NotImplementedError()
+    #
+    # def one_solution(self, query: Union[Atom, Clause]) -> Dict[Variable, Constant]:
+    #     """
+    #     Returns one (random) solution to the query
+    #
+    #     Arguments:
+    #         query query (Union[Atom,Clause]): query to check
+    #
+    #     Return:
+    #         dict (Dict[Variable,Constant]) mapping the variables in the query to constaints
+    #     """
+    #     raise NotImplementedError()
+    #
+    # def all_solutions(self, query: Union[Atom, Clause]) -> Sequence[Dict[Variable, Constant]]:
+    #     """
+    #     Returns all solutions to the query
+    #
+    #     Arguments:
+    #         query query (Union[Atom,Clause]): query to check
+    #
+    #     Return:
+    #         sequence of dict (Dict[Variable,Constant]) mapping the variables in the query to constants
+    #     """
+    #     raise NotImplementedError()
 
-        Arguments:
-            query (Union[Atom,Clause]): query to check
-
-        Return:
-            True/False
+    def has_solution(self, *query: Union[Atom, Not]):
         """
+                Checks whether the query can be satisfied by the knowledge base
+
+                Arguments:
+                    query (Union[Atom,Clause]): list of literals
+
+                Return:
+                    True/False
+                """
         raise NotImplementedError()
 
-    def one_solution(self, query: Union[Atom, Clause]) -> Dict[Variable, Constant]:
+    def query(self, *query, **kwargs):
         """
-        Returns one (random) solution to the query
+                Checks whether the query can be satisfied by the knowledge base
 
-        Arguments:
-            query query (Union[Atom,Clause]): query to check
+                Arguments:
+                    query (Union[Atom,Clause]): list of literals
 
-        Return:
-            dict (Dict[Variable,Constant]) mapping the variables in the query to constaints
-        """
-        raise NotImplementedError()
-
-    def all_solutions(self, query: Union[Atom, Clause]) -> Sequence[Dict[Variable, Constant]]:
-        """
-        Returns all solutions to the query
-
-        Arguments:
-            query query (Union[Atom,Clause]): query to check
-
-        Return:
-            sequence of dict (Dict[Variable,Constant]) mapping the variables in the query to constants
-        """
+                Return:
+                    True/False
+                """
         raise NotImplementedError()
 

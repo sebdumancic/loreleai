@@ -1,4 +1,4 @@
-from typing import Union, Dict, Sequence, Tuple
+from typing import Union, Sequence
 
 import kanren
 
@@ -53,42 +53,86 @@ class MiniKanren(LPSolver):
 
             rule[0].get_head().get_predicate().add_engine_object((KANREN_LOGPY, obj))
 
-    def _query(self, query: Union[Atom, Clause], num_sols=1) -> Tuple[Sequence[Sequence[str]], Sequence[Variable]]:
-        if isinstance(query, Atom):
-            vars = [x.as_kanren() for x in query.get_variables()]
-            ori_vars = [x for x in query.get_variables()]
-            if len(vars) == 0:
-                # needed in case
-                ori_vars = [x.as_kanren() for x in query.get_terms()]
+    # def _query(self, query: Union[Atom, Clause], num_sols=1) -> Tuple[Sequence[Sequence[str]], Sequence[Variable]]:
+    #     if isinstance(query, Atom):
+    #         vars = [x.as_kanren() for x in query.get_variables()]
+    #         ori_vars = [x for x in query.get_variables()]
+    #         if len(vars) == 0:
+    #             # needed in case
+    #             ori_vars = [x.as_kanren() for x in query.get_terms()]
+    #     else:
+    #         vars = [x.as_kanren() for x in query.get_head().get_variables()]
+    #         ori_vars = [x for x in query.get_head().get_variables()]
+    #
+    #     if isinstance(query, Atom):
+    #         goals = [query.as_kanren()]
+    #     else:
+    #         goals = [x.as_kanren() for x in query.get_literals()]
+    #
+    #     return kanren.run(num_sols, vars, *goals), ori_vars
+    #
+    # def has_solution(self, query: Union[Atom, Clause]) -> bool:
+    #     if isinstance(query, (Atom, Clause)):
+    #         res, _ = self._query(query, num_sols=1)
+    #
+    #         return True if res else False
+    #     else:
+    #         raise Exception(f"cannot query {type(query)}")
+    #
+    # def one_solution(self, query: Union[Atom, Clause]) -> Dict[Variable, Constant]:
+    #     res, vars = self._query(query, num_sols=1)
+    #
+    #     if len(res) == 0:
+    #         return {}
+    #
+    #     return dict(zip(vars, [c_const(x, vars[ind].get_type()) for ind, x in enumerate(res[0])]))
+    #
+    # def all_solutions(self, query: Union[Atom, Clause]) -> Sequence[Dict[Variable, Constant]]:
+    #     res, vars = self._query(query, num_sols=0)
+    #
+    #     if len(res) == 0:
+    #         return []
+    #
+    #     return [
+    #         dict(zip(vars, [c_const(y, vars[ind].get_type()) for ind, y in enumerate(x)])) for x in res
+    #     ]
+    #
+    def _query_new(self, num_solutions, *atoms: Atom):
+        # find variables
+        vars = {}
+        for atom in atoms:
+            for v in atom.get_variables():
+                if v not in vars:
+                    vars[v] = len(vars)
+
+        ori_vars = sorted(list(vars.keys()), key=lambda x: vars[x])
+        vars = [x.as_kanren() for x in ori_vars]
+
+        if len(vars) == 0:
+            terms = {}
+            for atom in atoms:
+                for t in atom.get_terms():
+                    if t not in terms:
+                        terms[t] = len(terms)
+            ori_vars = sorted(list(terms.keys()), key=lambda x: terms[x])
+            ori_vars = [x.as_kanren() for x in ori_vars]
+
+        goals = [x.as_kanren() for x in atoms]
+
+        return kanren.run(num_solutions, vars, *goals), ori_vars
+
+    def has_solution(self, *query: Union[Atom]):
+        res, _ = self._query_new(1, *query)
+
+        return True if res else False
+
+    def query(self, *query, **kwargs):
+        if 'max_solutions' in kwargs:
+            max_solutions = kwargs['max_solutions']
         else:
-            vars = [x.as_kanren() for x in query.get_head().get_variables()]
-            ori_vars = [x for x in query.get_head().get_variables()]
+            max_solutions = 0
 
-        if isinstance(query, Atom):
-            goals = [query.as_kanren()]
-        else:
-            goals = [x.as_kanren() for x in query.get_literals()]
-
-        return kanren.run(num_sols, vars, *goals), ori_vars
-
-    def has_solution(self, query: Union[Atom, Clause]) -> bool:
-        if isinstance(query, (Atom, Clause)):
-            res, _ = self._query(query, num_sols=1)
-
-            return True if res else False
-        else:
-            raise Exception(f"cannot query {type(query)}")
-
-    def one_solution(self, query: Union[Atom, Clause]) -> Dict[Variable, Constant]:
-        res, vars = self._query(query, num_sols=1)
-
-        if len(res) == 0:
-            return {}
-
-        return dict(zip(vars, [c_const(x, vars[ind].get_type()) for ind, x in enumerate(res[0])]))
-
-    def all_solutions(self, query: Union[Atom, Clause]) -> Sequence[Dict[Variable, Constant]]:
-        res, vars = self._query(query, num_sols=0)
+        res, vars = self._query_new(max_solutions, *query)
 
         if len(res) == 0:
             return []
@@ -96,3 +140,5 @@ class MiniKanren(LPSolver):
         return [
             dict(zip(vars, [c_const(y, vars[ind].get_type()) for ind, y in enumerate(x)])) for x in res
         ]
+
+

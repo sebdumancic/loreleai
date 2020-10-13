@@ -1,6 +1,6 @@
 from functools import reduce
 from math import log, ceil
-from typing import Union, Dict, Sequence
+from typing import Union
 
 from z3 import (
     Fixedpoint,
@@ -23,7 +23,8 @@ from loreleai.language.datalog import (
     Predicate,
     Atom,
     Clause,
-    c_id_to_const
+    c_id_to_const,
+    Not
 )
 from .datalogsolver import DatalogSolver
 
@@ -78,181 +79,252 @@ class MuZ(DatalogSolver):
         cl_muz = rule.as_muz()
         self._solver.rule(cl_muz[0], cl_muz[1])
 
-    def has_solution(self, query: Union[Atom, Clause]) -> bool:
-        """
-        Checks whether a query has a solution
+    # def has_solution(self, query: Union[Atom, Clause]) -> bool:
+    #     """
+    #     Checks whether a query has a solution
+    #
+    #     Arguments:
+    #         query [Union[Literal, Clause]]: a query to check
+    #
+    #     Returns:
+    #         True if there is a solution, False is no
+    #
+    #     """
+    #     if isinstance(query, Atom):
+    #         q = query.as_muz()
+    #         res = self._solver.query(q)
+    #         return True if res.r == 1 else False
+    #     elif isinstance(query, Clause):
+    #         body_atms = [x.as_muz() for x in query.get_literals()]
+    #         res = self._solver.query(*body_atms)
+    #         return True if res.r == 1 else False
+    #     else:
+    #         raise Exception(f"Cannot query {type(query)}")
+    #
+    # def one_solution(self, query: Union[Atom, Clause]) -> Dict[Variable, Constant]:
+    #     """
+    #     Returns one (random) solution to the query
+    #
+    #     Arguments:
+    #         query query (Union[Atom,Clause]): query to check
+    #
+    #     Return:
+    #         dict (Dict[Variable,Constant]) mapping the variables in the query to constaints
+    #     """
+    #     if isinstance(query, (Atom, Clause)):
+    #         if isinstance(query, Atom):
+    #             self._solver.query(query.as_muz())
+    #         else:
+    #             body_atms = [x.as_muz() for x in query.get_literals()]
+    #             self._solver.query(*body_atms)
+    #
+    #         ans = self._solver.get_answer()
+    #
+    #         if is_false(ans):
+    #             # no answer
+    #             return {}
+    #         elif not (is_and(ans) or is_or(ans)):
+    #             # value assignment of a single variable
+    #             val = int(ans.children()[1].as_long())
+    #             varb = query.get_variables()[0]
+    #             return {varb: c_id_to_const(val, varb.get_type())}
+    #         elif is_or(ans) and not (
+    #             is_and(ans.children()[0]) or is_or(ans.children()[0])
+    #         ):
+    #             # multiple value assignments to a single variable
+    #             ans = ans.children()[0]
+    #             val = int(ans.children()[1].as_long())
+    #             varb = query.get_variables()[0]
+    #             return {varb: c_id_to_const(val, varb.get_type())}
+    #         elif is_and(ans):
+    #             # single solution of more than 1 variable
+    #             pass
+    #         elif is_or(ans):
+    #             # multiple solutions to more than 1 variable
+    #             ans = ans.children()[0]
+    #         else:
+    #             raise Exception(f"don't know how to parse {ans}")
+    #
+    #         ans = [int(x.children()[1].as_long()) for x in ans.children()]
+    #
+    #         if isinstance(query, Atom):
+    #             args = query.get_variables()
+    #         else:
+    #             tmp_args = [v for x in query.get_literals() for v in x.get_variables()]
+    #             args = reduce(lambda x, y: x + [y] if y not in x else x, tmp_args, [])
+    #
+    #         if isinstance(query, Atom):
+    #             return dict(
+    #                 [
+    #                     (v, c_id_to_const(c, v.get_type().name))
+    #                     for v, c in zip(args, ans)
+    #                 ]
+    #             )
+    #         else:
+    #             head_vars = query.get_head().get_variables()
+    #             return dict(
+    #                 [
+    #                     (v, c_id_to_const(c, v.get_type().name))
+    #                     for v, c in zip(args, ans)
+    #                     if v in head_vars
+    #                 ]
+    #             )
+    #     else:
+    #         raise Exception(f"Cannot query {type(query)}")
+    #
+    # def all_solutions(
+    #     self, query: Union[Atom, Clause]
+    # ) -> Sequence[Dict[Variable, Constant]]:
+    #     """
+    #     Returns all solutions to the query
+    #
+    #     Arguments:
+    #         query query (Union[Atom,Clause]): query to check
+    #
+    #     Return:
+    #         sequence of dict (Dict[Variable,Constant]) mapping the variables in the query to constants
+    #     """
+    #     if isinstance(query, (Atom, Clause)):
+    #         if isinstance(query, Atom):
+    #             self._solver.query(query.as_muz())
+    #         else:
+    #             body_atms = [x.as_muz() for x in query.get_literals()]
+    #             self._solver.query(*body_atms)
+    #
+    #         ans = self._solver.get_answer()
+    #
+    #         if is_false(ans):
+    #             # no solution
+    #             return []
+    #         elif not (is_and(ans) or is_or(ans)):
+    #             # single solution, value of a single variable
+    #             val = int(ans.children()[1].as_long())
+    #             varb = query.get_variables()[0]
+    #             return [{varb: c_id_to_const(val, varb.get_type())}]
+    #         elif is_or(ans) and not (
+    #             is_and(ans.children()[0]) or is_or(ans.children()[0])
+    #         ):
+    #             # multiple solutions of single variable
+    #             vals = [int(x.children()[1].as_long()) for x in ans.children()]
+    #             varbs = query.get_variables()[0]
+    #             varbs = [varbs] * len(vals)
+    #             return [
+    #                 {k: c_id_to_const(v, varbs[0].get_type())}
+    #                 for k, v in zip(varbs, vals)
+    #             ]
+    #         elif is_and(ans):
+    #             # single solution of more than 1 variable
+    #             ans = [int(x.children()[1].as_long()) for x in ans.children()]
+    #             ans = [ans]
+    #         elif is_or(ans):
+    #             # multiple solutions of more than 1 variable
+    #             ans = ans.children()
+    #             ans = [
+    #                 [int(y.children()[1].as_long()) for y in x.children()] for x in ans
+    #             ]
+    #         else:
+    #             raise Exception(f"don't know how to parse {ans}")
+    #
+    #         if isinstance(query, Atom):
+    #             args = query.get_variables()
+    #         else:
+    #             tmp_args = [v for x in query.get_literals() for v in x.get_variables()]
+    #             args = reduce(lambda x, y: x + [y] if y not in x else x, tmp_args, [])
+    #
+    #         if isinstance(query, Atom):
+    #             return [
+    #                 dict(
+    #                     [
+    #                         (v, c_id_to_const(c, v.get_type().name))
+    #                         for v, c in zip(args, x)
+    #                     ]
+    #                 )
+    #                 for x in ans
+    #             ]
+    #         else:
+    #             head_vars = query.get_head().get_variables()
+    #             return [
+    #                 dict(
+    #                     [
+    #                         (v, c_id_to_const(c, v.get_type().name))
+    #                         for v, c in zip(args, x)
+    #                         if v in head_vars
+    #                     ]
+    #                 )
+    #                 for x in ans
+    #             ]
+    #     elif isinstance(query, Clause):
+    #         raise NotImplementedError()
+    #     else:
+    #         raise Exception(f"Cannot query {type(query)}")
 
-        Arguments:
-            query [Union[Literal, Clause]]: a query to check
+    def has_solution(self, *query: Union[Atom, Not]):
+        body_atms = [x.as_muz() for x in query]
+        res = self._solver.query(*body_atms)
+        return True if res.r == 1 else False
 
-        Returns:
-            True if there is a solution, False is no
-
-        """
-        if isinstance(query, Atom):
-            q = query.as_muz()
-            res = self._solver.query(q)
-            return True if res.r == 1 else False
-        elif isinstance(query, Clause):
-            body_atms = [x.as_muz() for x in query.get_literals()]
-            res = self._solver.query(*body_atms)
-            return True if res.r == 1 else False
+    def query(self, *query, **kwargs):
+        if 'max_solutions' in kwargs:
+            max_solutions = kwargs['max_solutions']
         else:
-            raise Exception(f"Cannot query {type(query)}")
+            max_solutions = -1
 
-    def one_solution(self, query: Union[Atom, Clause]) -> Dict[Variable, Constant]:
-        """
-        Returns one (random) solution to the query
+        body_atms = [x.as_muz() for x in query]
+        self._solver.query(*body_atms)
 
-        Arguments:
-            query query (Union[Atom,Clause]): query to check
+        ans = self._solver.get_answer()
 
-        Return:
-            dict (Dict[Variable,Constant]) mapping the variables in the query to constaints
-        """
-        if isinstance(query, (Atom, Clause)):
-            if isinstance(query, Atom):
-                self._solver.query(query.as_muz())
-            else:
-                body_atms = [x.as_muz() for x in query.get_literals()]
-                self._solver.query(*body_atms)
+        query_vars = [x.get_variables() for x in query]
+        query_vars = reduce(lambda x, y: x + [v for v in y if v not in x], query_vars, [])
 
-            ans = self._solver.get_answer()
-
-            if is_false(ans):
-                # no answer
-                return {}
-            elif not (is_and(ans) or is_or(ans)):
-                # value assignment of a single variable
-                val = int(ans.children()[1].as_long())
-                varb = query.get_variables()[0]
-                return {varb: c_id_to_const(val, varb.get_type())}
-            elif is_or(ans) and not (
+        if is_false(ans):
+            # no solution
+            return []
+        elif not (is_and(ans) or is_or(ans)):
+            # single solution, value of a single variable
+            val = int(ans.children()[1].as_long())
+            #varb = query.get_variables()[0]
+            varb = query_vars[0]
+            return [{varb: c_id_to_const(val, varb.get_type())}]
+        elif is_or(ans) and not (
                 is_and(ans.children()[0]) or is_or(ans.children()[0])
-            ):
-                # multiple value assignments to a single variable
-                ans = ans.children()[0]
-                val = int(ans.children()[1].as_long())
-                varb = query.get_variables()[0]
-                return {varb: c_id_to_const(val, varb.get_type())}
-            elif is_and(ans):
-                # single solution of more than 1 variable
-                pass
-            elif is_or(ans):
-                # multiple solutions to more than 1 variable
-                ans = ans.children()[0]
-            else:
-                raise Exception(f"don't know how to parse {ans}")
-
+        ):
+            # multiple solutions of single variable
+            vals = [int(x.children()[1].as_long()) for x in ans.children()]
+            #varbs = query.get_variables()[0]
+            varbs = query_vars[0]
+            varbs = [varbs] * len(vals)
+            return [
+                {k: c_id_to_const(v, varbs[0].get_type())}
+                for k, v in zip(varbs, vals)
+            ]
+        elif is_and(ans):
+            # single solution of more than 1 variable
             ans = [int(x.children()[1].as_long()) for x in ans.children()]
-
-            if isinstance(query, Atom):
-                args = query.get_variables()
-            else:
-                tmp_args = [v for x in query.get_literals() for v in x.get_variables()]
-                args = reduce(lambda x, y: x + [y] if y not in x else x, tmp_args, [])
-
-            if isinstance(query, Atom):
-                return dict(
-                    [
-                        (v, c_id_to_const(c, v.get_type().name))
-                        for v, c in zip(args, ans)
-                    ]
-                )
-            else:
-                head_vars = query.get_head().get_variables()
-                return dict(
-                    [
-                        (v, c_id_to_const(c, v.get_type().name))
-                        for v, c in zip(args, ans)
-                        if v in head_vars
-                    ]
-                )
+            ans = [ans]
+        elif is_or(ans):
+            # multiple solutions of more than 1 variable
+            ans = ans.children()
+            ans = [
+                [int(y.children()[1].as_long()) for y in x.children()] for x in ans
+            ]
         else:
-            raise Exception(f"Cannot query {type(query)}")
+            raise Exception(f"don't know how to parse {ans}")
 
-    def all_solutions(
-        self, query: Union[Atom, Clause]
-    ) -> Sequence[Dict[Variable, Constant]]:
-        """
-        Returns all solutions to the query
+        tmp_args = [v for x in query for v in x.get_variables()]
+        args = reduce(lambda x, y: x + [y] if y not in x else x, tmp_args, [])
 
-        Arguments:
-            query query (Union[Atom,Clause]): query to check
-
-        Return:
-            sequence of dict (Dict[Variable,Constant]) mapping the variables in the query to constants
-        """
-        if isinstance(query, (Atom, Clause)):
-            if isinstance(query, Atom):
-                self._solver.query(query.as_muz())
-            else:
-                body_atms = [x.as_muz() for x in query.get_literals()]
-                self._solver.query(*body_atms)
-
-            ans = self._solver.get_answer()
-
-            if is_false(ans):
-                # no solution
-                return []
-            elif not (is_and(ans) or is_or(ans)):
-                # single solution, value of a single variable
-                val = int(ans.children()[1].as_long())
-                varb = query.get_variables()[0]
-                return [{varb: c_id_to_const(val, varb.get_type())}]
-            elif is_or(ans) and not (
-                is_and(ans.children()[0]) or is_or(ans.children()[0])
-            ):
-                # multiple solutions of single variable
-                vals = [int(x.children()[1].as_long()) for x in ans.children()]
-                varbs = query.get_variables()[0]
-                varbs = [varbs] * len(vals)
-                return [
-                    {k: c_id_to_const(v, varbs[0].get_type())}
-                    for k, v in zip(varbs, vals)
+        answer = [
+            dict(
+                [
+                    (v, c_id_to_const(c, v.get_type().name))
+                    for v, c in zip(args, x)
                 ]
-            elif is_and(ans):
-                # single solution of more than 1 variable
-                ans = [int(x.children()[1].as_long()) for x in ans.children()]
-                ans = [ans]
-            elif is_or(ans):
-                # multiple solutions of more than 1 variable
-                ans = ans.children()
-                ans = [
-                    [int(y.children()[1].as_long()) for y in x.children()] for x in ans
-                ]
-            else:
-                raise Exception(f"don't know how to parse {ans}")
+            )
+            for x in ans
+        ]
 
-            if isinstance(query, Atom):
-                args = query.get_variables()
-            else:
-                tmp_args = [v for x in query.get_literals() for v in x.get_variables()]
-                args = reduce(lambda x, y: x + [y] if y not in x else x, tmp_args, [])
-
-            if isinstance(query, Atom):
-                return [
-                    dict(
-                        [
-                            (v, c_id_to_const(c, v.get_type().name))
-                            for v, c in zip(args, x)
-                        ]
-                    )
-                    for x in ans
-                ]
-            else:
-                head_vars = query.get_head().get_variables()
-                return [
-                    dict(
-                        [
-                            (v, c_id_to_const(c, v.get_type().name))
-                            for v, c in zip(args, x)
-                            if v in head_vars
-                        ]
-                    )
-                    for x in ans
-                ]
-        elif isinstance(query, Clause):
-            raise NotImplementedError()
+        if max_solutions > 0:
+            return answer[:max_solutions]
         else:
-            raise Exception(f"Cannot query {type(query)}")
+            return answer
