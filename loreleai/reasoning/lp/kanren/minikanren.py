@@ -67,7 +67,7 @@ class MiniKanren(LPSolver):
         if isinstance(query, Atom):
             goals = [query.as_kanren()]
         else:
-            goals = [x.as_kanren() for x in query.get_atoms()]
+            goals = [x.as_kanren() for x in query.get_literals()]
 
         return kanren.run(num_sols, vars, *goals), ori_vars
 

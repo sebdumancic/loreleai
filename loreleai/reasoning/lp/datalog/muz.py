@@ -94,7 +94,7 @@ class MuZ(DatalogSolver):
             res = self._solver.query(q)
             return True if res.r == 1 else False
         elif isinstance(query, Clause):
-            body_atms = [x.as_muz() for x in query.get_atoms()]
+            body_atms = [x.as_muz() for x in query.get_literals()]
             res = self._solver.query(*body_atms)
             return True if res.r == 1 else False
         else:
@@ -114,7 +114,7 @@ class MuZ(DatalogSolver):
             if isinstance(query, Atom):
                 self._solver.query(query.as_muz())
             else:
-                body_atms = [x.as_muz() for x in query.get_atoms()]
+                body_atms = [x.as_muz() for x in query.get_literals()]
                 self._solver.query(*body_atms)
 
             ans = self._solver.get_answer()
@@ -149,7 +149,7 @@ class MuZ(DatalogSolver):
             if isinstance(query, Atom):
                 args = query.get_variables()
             else:
-                tmp_args = [v for x in query.get_atoms() for v in x.get_variables()]
+                tmp_args = [v for x in query.get_literals() for v in x.get_variables()]
                 args = reduce(lambda x, y: x + [y] if y not in x else x, tmp_args, [])
 
             if isinstance(query, Atom):
@@ -187,7 +187,7 @@ class MuZ(DatalogSolver):
             if isinstance(query, Atom):
                 self._solver.query(query.as_muz())
             else:
-                body_atms = [x.as_muz() for x in query.get_atoms()]
+                body_atms = [x.as_muz() for x in query.get_literals()]
                 self._solver.query(*body_atms)
 
             ans = self._solver.get_answer()
@@ -227,7 +227,7 @@ class MuZ(DatalogSolver):
             if isinstance(query, Atom):
                 args = query.get_variables()
             else:
-                tmp_args = [v for x in query.get_atoms() for v in x.get_variables()]
+                tmp_args = [v for x in query.get_literals() for v in x.get_variables()]
                 args = reduce(lambda x, y: x + [y] if y not in x else x, tmp_args, [])
 
             if isinstance(query, Atom):
