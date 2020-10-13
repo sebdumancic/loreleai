@@ -361,6 +361,9 @@ class Predicate:
     def signature(self) -> Tuple[str, int]:
         return self.name, self.get_arity()
 
+    def as_proposition(self) -> "Atom":
+        return Atom(self, [])
+
     def add_engine_object(self, elem):
         if isinstance(elem, tuple):
             # add object as (engine name, object)
@@ -606,6 +609,9 @@ class Body:
         if isinstance(other, Literal):
             self._literals += [other]
             return self
+        elif isinstance(other, Predicate):
+            self._literals += [other.as_proposition()]
+            return self
         elif isinstance(other, Body):
             self._literals += other.get_literals()
             return self
@@ -625,9 +631,12 @@ class Clause:
         body (List(Atom)): list of atoms in the body of the clause
     """
 
-    def __init__(self, head: Atom, body: Union[Sequence[Literal], Body]):
+    def __init__(self, head: Union[Atom, Predicate], body: Union[Sequence[Literal], Body]):
         super(Clause, self).__init__()
-        self._head: Atom = head
+        if isinstance(head, Predicate):
+            self._head: Atom = head.as_proposition()
+        else:
+            self._head: Atom = head
 
         if isinstance(body, Body):
             self._body: Sequence[Literal] = body.get_literals()
