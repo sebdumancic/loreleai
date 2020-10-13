@@ -17,7 +17,7 @@ def _turn_clause_to_interim_repr(clause: Clause, suffix: str = "_x"):
             head_vars[t] if isinstance(t, Variable) and t in head_vars else t
             for t in a.get_terms()
         ])
-        for a in clause.get_atoms()
+        for a in clause.get_literals()
     ]
 
 

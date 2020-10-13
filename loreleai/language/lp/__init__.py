@@ -14,14 +14,22 @@ from ..commons import (
     c_id_to_const,
     c_var,
     c_literal,
+    c_find_domain,
+    c_functor,
+    c_symbol,
     Atom,
+    Not,
     Clause,
     are_variables_connected,
     c_fresh_var,
     Literal,
     Procedure,
     Disjunction,
-    Recursion
+    Recursion,
+    Functor,
+    global_context,
+    list_func,
+    List
 )
 
 from ..utils import triplet
@@ -43,13 +51,21 @@ __all__ = [
     "c_id_to_const",
     "c_var",
     "c_literal",
+    "c_find_domain",
+    "c_functor",
+    "c_symbol",
     "Clause",
     "Atom",
+    "Not",
     "are_variables_connected",
     "c_fresh_var",
     'triplet',
     'Literal',
     'Procedure',
     "Disjunction",
-    "Recursion"
+    "Recursion",
+    "Functor",
+    "global_context",
+    "list_func",
+    "List"
 ]

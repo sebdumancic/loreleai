@@ -2,7 +2,7 @@ from abc import ABC
 from dataclasses import dataclass
 from functools import reduce
 from itertools import combinations
-from typing import Dict, List, Tuple, Sequence, Set, Union
+from typing import Dict, Tuple, Sequence, Set, Union
 
 import kanren
 import networkx as nx
@@ -68,9 +68,12 @@ class Term:
         Term base class. A common base class for Predicate, Constant, Variable and Functor symbols.
     """
 
-    def __init__(self, name, sym_type):
+    def __init__(self, name, sym_type: Type = None):
         self.name = name
-        self.type = sym_type
+        if sym_type is None:
+            self.type = c_type("thing")
+        else:
+            self.type = sym_type
         self.hash_cache = None
         self._engine_objects = {}
 
@@ -176,7 +179,9 @@ class Variable(Term):
     Implements a Variable functionality
     """
 
-    def __init__(self, name: str, sym_type):
+    def __init__(self, name: str, sym_type: Type = None):
+        if sym_type is None:
+            sym_type = c_type("thing")
         if name[0].islower():
             raise Exception("Variables should uppercase!")
         super().__init__(name, sym_type)
@@ -207,14 +212,63 @@ class Variable(Term):
             return False
 
 
-@dataclass
-class Structure(Term):
-    def __init__(self, name: str, sym_type, arguments):
-        super(Structure, self).__init__(name, sym_type)
-        self.arguments = arguments
+class Functor:
+
+    def __init__(self, name: str, arity: int, types: Sequence[Type] = None):
+        self._name: str = name
+        self._arity: int = arity
+        self._arg_types: Sequence[Type] = types
+
+    def get_name(self) -> str:
+        return self._name
+
+    def get_arity(self) -> int:
+        return self._arity
+
+    def __eq__(self, other):
+        if isinstance(other, Functor):
+            return self._name == other._name and self._arity == other._arity
+        else:
+            return False
+
+    def __hash__(self):
+        return hash(f"func:{self._name}/{self._arity}")
 
     def __repr__(self):
-        return "{}({})".format(self.name, ",".join(self.arguments))
+        return self._name
+
+    def __call__(self, *args: Union[str, "Constant", "Variable", "Structure", "List", int, float]) -> "Structure":
+        args_to_use = []
+        global global_context
+        elem: Union[str, "Constant", "Variable", "Structure", "List", int, float]
+        for ind, elem in enumerate(args):
+            if isinstance(elem, str) and elem.islower():
+                if self._arg_types is None:
+                    args_to_use.append(c_const(elem))
+                else:
+                    args_to_use.append(c_const(elem, self._arg_types[ind]))
+            elif isinstance(elem, str) and elem.isupper():
+                if self._arg_types is None:
+                    args_to_use.append(c_var(elem))
+                else:
+                    args_to_use.append(c_var(elem, self._arg_types[ind]))
+            elif isinstance(elem, (Constant, Variable, Structure, List, int, float)):
+                args_to_use.append(elem)
+            else:
+                raise Exception(f"don't know how to convert {type(elem)} {elem} to term")
+
+        return Structure(self, args_to_use)
+
+
+@dataclass
+class Structure(Term):
+    def __init__(self, functor: "Functor", arguments: Sequence[Term]):
+        super(Structure, self).__init__(functor.get_name())
+        self.arguments: Sequence[Term] = arguments
+        self._functor: Functor = functor
+
+    def __repr__(self):
+        return "{}({})".format(self.name, ",".join([str(x) for x in self.arguments]))
 
     def __eq__(self, other):
         if isinstance(self, type(other)):
@@ -229,13 +283,64 @@ class Structure(Term):
     def arity(self):
         return len(self.arguments)
 
+    def get_functor(self) -> Functor:
+        return self._functor
+
+    def get_arguments(self) -> Sequence[Term]:
+        return [x for x in self.arguments]
+
     def add_engine_object(self, elem):
-        raise NotImplementedError()
+        if isinstance(elem, tuple):
+            # add object as (engine name, object)
+            assert elem[0] in [MUZ, KANREN_LOGPY]
+            self._engine_objects[elem[0]] = elem[1]
+        elif z3.is_func_decl(elem):
+            self._engine_objects[MUZ] = elem
+        elif isinstance(elem, kanren.Relation):
+            self._engine_objects[KANREN_LOGPY] = elem
+        else:
+            raise Exception(f"unsupported Predicate object {type(elem)}")
+
+    def get_engine_obj(self, eng):
+        assert eng in [MUZ, KANREN_LOGPY]
+        return self._engine_objects[eng]
+
+
+list_func = Functor(".", 2)
+
+# Swipl uses '[|]' as the functor for lists
+# GNU PRolog uses '.' as the list functor
+# XSB uses '.' as the list functor
+
+# list conventions
+#    -  [...] is a list in which empty list as the last element is implicitly assumed
+#    -  if the user wants a something list [a|Y] (no empty list at the end), it has to explicitly construct it with pairs
+
+
+class List(Structure):
+
+    def __init__(self, elements: Sequence[Union[Term, int, float]]):
+        argsToUse = []
+        for elem in elements:
+            if isinstance(elem, str) and elem[0].isupper():
+                argsToUse.append(global_context.variable(elem))
+            elif isinstance(elem, str) and elem[0].islower():
+                argsToUse.append(global_context.constant(elem))
+            elif isinstance(elem, (Constant, Variable, Structure, Predicate, List)):
+                argsToUse.append(elem)
+            elif isinstance(elem, (int, float)):
+                argsToUse.append(elem)
+            else:
+                raise Exception(f"Predicate:Don't know how to convert {type(elem)} {elem} to term")
+        super(List, self).__init__(list_func, argsToUse)
+
+    def __repr__(self):
+        return f"[{','.join([str(x) for x in self.arguments])}]"
 
 
 @dataclass
 class Predicate:
-    def __init__(self, name: str, arity: int, arguments: List[Type] = None):
+    def __init__(self, name: str, arity: int, arguments: Sequence[Type] = None):
         self.name = name
         self.arity = arity
         self.argument_types = (
@@ -250,7 +355,7 @@ class Predicate:
     def get_arity(self) -> int:
         return self.arity
 
-    def get_arg_types(self) -> List[Type]:
+    def get_arg_types(self) -> Sequence[Type]:
         return self.argument_types
 
     def signature(self) -> Tuple[str, int]:
@@ -365,7 +470,7 @@ class Formula:
 class Literal(ABC):
 
     def __init__(self):
-        self._properties: Dict[object, object]
+        self._properties: Dict = {}
         self._hash_cache: int = None
 
     def add_property(self, property_name: str, value):
@@ -380,16 +485,16 @@ class Literal(ABC):
     def get_predicate(self) -> Predicate:
         raise NotImplementedError
 
-    def get_variables(self) -> List[Variable]:
+    def get_variables(self) -> Sequence[Variable]:
         raise NotImplementedError
 
-    def get_terms(self) -> List[Term]:
+    def get_terms(self) -> Sequence[Term]:
         raise NotImplementedError
 
 
 @dataclass
 class Atom(Literal):
-    def __init__(self, predicate: Predicate, arguments: List[Term]):
+    def __init__(self, predicate: Predicate, arguments: Sequence[Union[Term, int, float]]):
         super(Atom, self).__init__()
         self.predicate = predicate
         self.arguments = arguments
@@ -407,10 +512,13 @@ class Atom(Literal):
     def get_predicates(self) -> Set[Predicate]:
         return {self.get_predicate()}
 
-    def get_variables(self) -> List[Variable]:
+    def get_variables(self) -> Sequence[Variable]:
         return [x for x in self.arguments if isinstance(x, Variable)]
 
-    def get_terms(self) -> List[Term]:
+    def get_terms(self) -> Sequence[Term]:
+        return [x for x in self.arguments]
+
+    def get_arguments(self) -> Sequence[Term]:
         return [x for x in self.arguments]
 
     def as_muz(self):
@@ -423,9 +531,10 @@ class Atom(Literal):
         return self.predicate.as_kanren()(*args)
 
     def __repr__(self):
-        return "{}({})".format(
-            self.predicate.get_name(), ",".join([str(x) for x in self.arguments])
-        )
+        if self.predicate.get_arity() > 0:
+            return f"{self.predicate}({','.join([str(x) for x in self.arguments])})"
+        else:
+            return f"{self.predicate}"
 
     def __eq__(self, other):
         if isinstance(self, type(other)):
@@ -460,10 +569,10 @@ class Not(Literal):
     def substitute(self, term_map: Dict[Term, Term]) -> "Not":
         return Not(self.atom.substitute(term_map))
 
-    def get_variables(self) -> List[Variable]:
+    def get_variables(self) -> Sequence[Variable]:
         return self.atom.get_variables()
 
-    def get_terms(self) -> List[Term]:
+    def get_terms(self) -> Sequence[Term]:
         return self.atom.get_terms()
 
     def get_atom(self) -> Atom:
@@ -516,7 +625,7 @@ class Clause:
         body (List(Atom)): list of atoms in the body of the clause
     """
 
-    def __init__(self, head: Atom, body: Union[List[Literal], Body]):
+    def __init__(self, head: Atom, body: Union[Sequence[Literal], Body]):
         super(Clause, self).__init__()
         self._head: Atom = head
 
@@ -566,7 +675,7 @@ class Clause:
 
         return variables
 
-    def get_atoms(self, with_predicates: Set[Predicate] = None) -> List[Atom]:
+    def get_literals(self, with_predicates: Set[Predicate] = None) -> Sequence[Atom]:
         """
             Returns the set of atoms in the clause
 
@@ -607,7 +716,7 @@ class Clause:
 
     def substitute_atoms(
         self,
-        atoms_to_replace: List[Union[Atom, Not]],
+        atoms_to_replace: Sequence[Union[Atom, Not]],
         new_atom: Atom,
         substitutes: Dict[Term, Term],
     ) -> "Clause":
@@ -656,7 +765,7 @@ class Clause:
                 [x.get_predicate().as_kanren()(
                     *[args[hvars[y]] if y in hvars else vars_to_use[y] for y in x.get_terms()]
                 )
-                 for x in core_obj.get_atoms()]
+                 for x in core_obj.get_literals()]
             )
 
         return generic_predicate
@@ -797,9 +906,12 @@ class Context:
         self._variables = {}  # domain -> {name -> Variable}
         self._constants = {}  # domain -> {name -> Constant}
         self._literals = {}  # Predicate -> { tuple of terms -> Atom}
-                             # ; TO BE USED FOR LP
         self._domains = {"thing": Type("thing")}  # name -> Type
         self._id_to_constant = {}  # domain (str) -> {id -> Constant}
+        self._functors = {} # arity -> name -> Functor
+
+        self._functors[2] = {}
+        self._functors[2]['.'] = list_func
 
     def _predicate_sig(self, name, arity):
         return f"{name}/{arity}"
@@ -889,7 +1001,7 @@ class Context:
 
         return self._constants[domain][name]
 
-    def literal(self, predicate: Predicate, arguments: List[Term]) -> "Atom":
+    def literal(self, predicate: Predicate, arguments: Sequence[Term]) -> "Atom":
         if predicate not in self._literals:
             self._literals[predicate] = {}
 
@@ -897,6 +1009,59 @@ class Context:
             self._literals[predicate][tuple(arguments)] = Atom(predicate, arguments)
 
         return self._literals[predicate][tuple(arguments)]
+
+    def find_domain(self, const: Union[str, Constant]):
+        """
+            Find domain of a constant
+        :param const:
+        :return:
+        """
+        if isinstance(const, Constant):
+            const = const.get_name()
+
+        for dom in self._constants:
+            if const in self._constants[dom]:
+                return self.type(dom)
+        else:
+            return self.type("thing")
+
+    def functor(self, name: str, arity: int = None, types: Sequence[Type] = None):
+        # check if already exists
+        found = []
+        for ar in [arity] if (arity is not None and arity in self._functors) else self._functors:
+            if name in self._functors[ar]:
+                found.append(self._functors[ar][name])
+        if len(found) == 1:
+            return found[0]
+        else:
+            # if doesn't exist
+            assert(arity is not None or types is not None, "creating new functor requires either arity or argument types")
+            if types is None:
+                if arity not in self._functors:
+                    self._functors[arity] = {}
+                self._functors[arity][name] = Functor(name, arity)
+                return self._functors[arity][name]
+            else:
+                arity = len(types)
+                if arity not in self._functors:
+                    self._functors[arity] = {}
+                self._functors[arity][name] = Functor(name, arity, types)
+                return self._functors[arity][name]
+
+    def symbol(self, name: str, arity: int = None, types: Sequence[Type] = None):
+        for dom in self._constants:
+            if name in self._constants[dom]:
+                return self._constants[dom][name]
+        for ar in self._functors:
+            if name in self._functors[ar]:
+                return self._functors[ar][name]
+        for ar in self._predicates:
+            if f"{name}/{ar}" in self._predicates:
+                return self._predicates[f"{name}/{ar}"]
+
+        assert arity is not None
+        # if symbol does not exists, assume predicate
+        return self.functor(name, arity, types)
 
 
 global_context = Context()
@@ -931,7 +1096,7 @@ def c_var(name, domain=None, ctx: Context = None) -> Variable:
 
 
 def c_literal(
-    predicate: Predicate, arguments: List[Term], ctx: Context = None
+    predicate: Predicate, arguments: Sequence[Term], ctx: Context = None
 ) -> Atom:
     ctx = _get_proper_context(ctx)
     return ctx.literal(predicate, arguments)
@@ -943,6 +1108,42 @@ def c_fresh_var(
 ) -> Variable:
     ctx = _get_proper_context(ctx)
     return ctx.fresh_variable(domain=domain)
+
+
+def c_find_domain(
+        const: Union[str, Constant],
+        ctx: Context = None
+) -> Type:
+    ctx = _get_proper_context(ctx)
+    return ctx.find_domain(const)
+
+
+def c_type(
+        name: str,
+        ctx: Context = None
+) -> Type:
+    ctx = _get_proper_context(ctx)
+    return ctx.type(name)
+
+
+def c_functor(
+        name: str,
+        arity: int = None,
+        types: Sequence[Type] = None,
+        ctx: Context = None
+) -> Functor:
+    ctx = _get_proper_context(ctx)
+    return ctx.functor(name, arity, types)
+
+
+def c_symbol(
+        name: str,
+        arity: int = None,
+        types: Sequence[Type] = None,
+        ctx: Context = None
+) -> Union[Term, Functor, Predicate]:
+    ctx = _get_proper_context(ctx)
+    return ctx.symbol(name, arity, types)
 
 
 def are_variables_connected(atoms: Sequence[Atom]):
@@ -970,8 +1171,8 @@ def are_variables_connected(atoms: Sequence[Atom]):
 
 
 def _are_two_set_of_literals_identical(
-    clause1: Union[List[Atom], Dict[Sequence[Predicate], Dict]],
-    clause2: Union[List[Atom], Dict[Sequence[Predicate], Dict]],
+    clause1: Union[Sequence[Atom], Dict[Sequence[Predicate], Dict]],
+    clause2: Union[Sequence[Atom], Dict[Sequence[Predicate], Dict]],
 ) -> bool:
     """
     Checks whether two sets of literal are identical, i.e. unify, up to the variable naming
@@ -1009,7 +1210,7 @@ def _are_two_set_of_literals_identical(
 
 
 def _create_term_signatures(
-    literals: List[Union[Atom, Not]]
+    literals: Sequence[Union[Atom, Not]]
 ) -> Dict[Term, Dict[Tuple[Predicate], int]]:
     """
         Creates a term signature for each term in the set of literals
@@ -1032,7 +1233,7 @@ def _create_term_signatures(
                 term_signatures[trm] = {}
 
             if isinstance(lit, Not):
-                tmp_atm = lit.get_formula()
+                tmp_atm = lit.get_atom()
                 if isinstance(tmp_atm, Atom):
                     tmp_sig = (f"not_{tmp_atm.get_predicate().get_name()}", ind)
                 else:

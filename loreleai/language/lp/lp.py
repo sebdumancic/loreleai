@@ -88,7 +88,7 @@ class ClausalTheory(Theory):
 
         def _unfold_recursively(clause: Clause, clause_index: Dict[Predicate, List[Clause]], forbidden_clauses: Set[
             Clause]) -> Tuple[List[Clause], Set[Clause]]:
-            cl_predicates = [x.get_predicate() for x in clause.get_atoms()]
+            cl_predicates = [x.get_predicate() for x in clause.get_literals()]
             if len(forbidden_clauses) == 0:
                 matching_clauses_for_unfolding = dict([(k, clause_index[k]) for k in cl_predicates if k in clause_index])
             else:
@@ -147,7 +147,7 @@ class ClausalTheory(Theory):
 
         for cl in self._formulas:
             predicates_in_heads.add(cl.get_head().get_predicate())
-            predicates_in_bodies_only = predicates_in_bodies_only.union([x.get_predicate() for x in cl.get_atoms()])
+            predicates_in_bodies_only = predicates_in_bodies_only.union([x.get_predicate() for x in cl.get_literals()])
 
         predicates_in_bodies_only = [x for x in predicates_in_bodies_only if x not in predicates_in_heads]
 
@@ -166,7 +166,7 @@ class ClausalTheory(Theory):
                 graph.add_node(cl_to_node_name[cl.get_head().get_predicate()], clause=cl.get_head().get_predicate(), color='black' if ('latent' in cl.get_head().get_predicate().get_name() or "_" in cl.get_head().get_predicate().get_name()) else 'red')
 
         for cl in self._formulas:
-            body_p = [x.get_predicate() for x in cl.get_atoms()]
+            body_p = [x.get_predicate() for x in cl.get_literals()]
 
             for p in body_p:
                 graph.add_edge(cl_to_node_name[cl.get_head().get_predicate()], cl_to_node_name[p])
