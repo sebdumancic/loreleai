@@ -21,7 +21,8 @@ from ..commons import (
     Literal,
     Procedure,
     Disjunction,
-    Recursion
+    Recursion,
+    Context
 )
 from ..lp.lp import ClausalTheory
 
@@ -49,5 +50,6 @@ __all__ = [
     "Literal",
     "Procedure",
     "Disjunction",
-    "Recursion"
+    "Recursion",
+    "Context"
 ]

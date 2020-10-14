@@ -180,7 +180,7 @@ class GNUProlog(Prolog):
 
     def __init__(self):
         pygprolog.pygp_Start_Prolog()
-        super().__init__()
+        super().__init__("GNUProlog")
 
     def __del__(self):
         pygprolog.pygp_Stop_Prolog()

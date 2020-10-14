@@ -29,7 +29,8 @@ from ..commons import (
     Functor,
     global_context,
     list_func,
-    List
+    List,
+    Context
 )
 
 from ..utils import triplet
@@ -67,5 +68,6 @@ __all__ = [
     "Functor",
     "global_context",
     "list_func",
-    "List"
+    "List",
+    "Context"
 ]

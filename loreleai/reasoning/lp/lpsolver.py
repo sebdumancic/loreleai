@@ -1,10 +1,11 @@
+from abc import ABC, abstractmethod
 from typing import Union
 
 from loreleai.language.commons import Atom, Clause, Context, global_context
 from loreleai.language.lp import Predicate, Type, Constant, Variable, Not
 
 
-class LPSolver:
+class LPSolver(ABC):
     """
     An abstract class implementing a logic programming solver/reasoner
 
@@ -45,6 +46,7 @@ class LPSolver:
         """
         return self._name
 
+    @abstractmethod
     def declare_type(self, elem_type: Type) -> None:
         """
         Instantiates the type/domain/sort within the solver.
@@ -55,6 +57,7 @@ class LPSolver:
         """
         raise NotImplementedError()
 
+    @abstractmethod
     def declare_predicate(self, elem_predicate: Predicate) -> None:
         """
         Instantiates the predicate symbol within the solver.
@@ -65,6 +68,7 @@ class LPSolver:
         """
         raise NotImplementedError()
 
+    @abstractmethod
     def declare_constant(self, elem_constant: Constant) -> None:
         """
         Instantiates the constant symbol within the solver.
@@ -75,6 +79,7 @@ class LPSolver:
         """
         raise NotImplementedError()
 
+    @abstractmethod
     def declare_variable(self, elem_variable: Variable) -> None:
         """
         Instantiates the variable symbol within the solver.
@@ -85,6 +90,7 @@ class LPSolver:
         """
         raise NotImplementedError()
 
+    @abstractmethod
     def assert_fact(self, fact: Atom) -> None:
         """
         Asserts fact to the solvers knowledge base
@@ -94,6 +100,7 @@ class LPSolver:
         """
         raise NotImplementedError()
 
+    @abstractmethod
     def assert_rule(self, rule: Clause) -> None:
         """
         Asserts rule to the solvers knowledge base
@@ -103,42 +110,7 @@ class LPSolver:
         """
         raise NotImplementedError()
 
-    # def has_solution(self, query: Union[Atom, Clause]) -> bool:
-    #     """
-    #     Checks whether the query can be satisfied by the knowledge base
-    #
-    #     Arguments:
-    #         query (Union[Atom,Clause]): query to check
-    #
-    #     Return:
-    #         True/False
-    #     """
-    #     raise NotImplementedError()
-    #
-    # def one_solution(self, query: Union[Atom, Clause]) -> Dict[Variable, Constant]:
-    #     """
-    #     Returns one (random) solution to the query
-    #
-    #     Arguments:
-    #         query query (Union[Atom,Clause]): query to check
-    #
-    #     Return:
-    #         dict (Dict[Variable,Constant]) mapping the variables in the query to constaints
-    #     """
-    #     raise NotImplementedError()
-    #
-    # def all_solutions(self, query: Union[Atom, Clause]) -> Sequence[Dict[Variable, Constant]]:
-    #     """
-    #     Returns all solutions to the query
-    #
-    #     Arguments:
-    #         query query (Union[Atom,Clause]): query to check
-    #
-    #     Return:
-    #         sequence of dict (Dict[Variable,Constant]) mapping the variables in the query to constants
-    #     """
-    #     raise NotImplementedError()
-
+    @abstractmethod
     def has_solution(self, *query: Union[Atom, Not]):
         """
                 Checks whether the query can be satisfied by the knowledge base
@@ -151,6 +123,7 @@ class LPSolver:
                 """
         raise NotImplementedError()
 
+    @abstractmethod
     def query(self, *query, **kwargs):
         """
                 Checks whether the query can be satisfied by the knowledge base

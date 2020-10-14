@@ -296,7 +296,7 @@ class SWIProlog(Prolog):
         self._callback_arities = {}
         self._wrapped_functions = {}
         self._wrap_refs_to_keep = []
-        super(SWIProlog, self).__init__()
+        super(SWIProlog, self).__init__("SWIPL")
 
     def __del__(self):
         swipy.swipy_cleanup(1)

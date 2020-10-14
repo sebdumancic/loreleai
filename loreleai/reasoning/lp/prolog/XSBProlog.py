@@ -92,7 +92,7 @@ class XSBProlog(Prolog):
             exec_path = os.getenv('XSB_HOME', None)
             raise Exception(f"Cannot find XSB_HOME environment variable")
         pyxsb.pyxsb_init_string(exec_path)
-        super().__init__()
+        super().__init__("XSBProlog")
 
     def __del__(self):
         pyxsb.pyxsb_close()
