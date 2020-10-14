@@ -6,25 +6,25 @@ from typing import List, Dict, Set, Tuple, Sequence
 import pygraphviz as pgv
 
 # from . import parse
-from ..commons import Predicate, Theory, c_var, \
+from ..commons import Predicate, Program, c_var, \
     c_pred, c_const, c_literal, Clause, _are_two_set_of_literals_identical
 
 
-class ClausalTheory(Theory):
+class ClausalTheory(Program):
 
-    def __init__(self, formulas: Sequence[Clause] = None, read_from_file: str = None):
-        assert formulas is not None or read_from_file is not None
+    def __init__(self, clauses: Sequence[Clause] = None, read_from_file: str = None):
+        assert clauses is not None or read_from_file is not None
 
         if read_from_file:
             # TODO: fix this for clauses that spread on more than one line
-            formulas = []
+            clauses = []
             inf = open(read_from_file)
 
             for line in inf.readlines():
                 if len(line) > 3 and not line.startswith('#') and not line.startswith('%') and not line.startswith('//') and not line.startswith('true.'):
-                    formulas.append(parse(line.strip().replace('.', '')))
+                    clauses.append(parse(line.strip().replace('.', '')))
 
-        super(ClausalTheory, self).__init__(formulas)
+        super(ClausalTheory, self).__init__(clauses)
 
     def get_clauses(self, predicates: Set[Predicate] = None) -> Sequence[Clause]:
         if predicates:

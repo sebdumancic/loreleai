@@ -889,11 +889,11 @@ class Recursion(Procedure):
         super().__init__(clauses)
 
 
-class Theory:
-    def __init__(self, formulas: Sequence[Clause]):
-        self._clauses: Sequence = formulas
+class Program:
+    def __init__(self, clauses: Sequence[Clause, Procedure, Atom]):
+        self._clauses: Sequence[Union[Clause, Procedure, Atom]] = clauses
 
-    def get_clauses(self, predicates: Set[Predicate] = None) -> Sequence[Union[Clause,Procedure]]:
+    def get_clauses(self, predicates: Set[Predicate] = None) -> Sequence[Union[Clause, Procedure, Atom]]:
         if predicates:
             return [x for x in self._clauses if any([p for p in x.get_predicates()])]
         else:
@@ -902,7 +902,7 @@ class Theory:
     def __len__(self):
         return len(self.get_clauses())
 
-    def num_literals(self):
+    def num_literals(self) -> int:
         return sum([len(x) for x in self._clauses])
 
     def get_predicates(self) -> Set[Predicate]:
