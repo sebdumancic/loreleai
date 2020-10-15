@@ -149,7 +149,7 @@ def _lit_to_swipy(clause: Atom, lit_var_store: Dict[Variable, int]):
         args = clause.get_arguments()
         _to_swipy_ref(args[0], compound_arg, lit_var_store)
         for i in range(1, clause.get_predicate().get_arity()):
-            _to_swipy_ref(args[i], compound_arg + 1, lit_var_store)
+            _to_swipy_ref(args[i], compound_arg+i, lit_var_store)
 
         literal = swipy.swipy_new_term_ref()
         swipy.swipy_cons_functor(literal, functor, compound_arg)
