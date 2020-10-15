@@ -155,6 +155,8 @@ class XSBProlog(Prolog):
             res = pyxsb.pyxsb_next_string()
             max_solutions -= 1
 
+        pyxsb.pyxsb_close_query()
+
         return all_solutions
 
     def register_foreign(self, pyfunction, arity):
