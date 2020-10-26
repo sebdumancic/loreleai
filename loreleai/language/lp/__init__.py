@@ -30,7 +30,8 @@ from ..commons import (
     global_context,
     list_func,
     List,
-    Context
+    Context,
+    FillerPredicate
 )
 
 from ..utils import triplet
@@ -69,5 +70,6 @@ __all__ = [
     "global_context",
     "list_func",
     "List",
-    "Context"
+    "Context",
+    "FillerPredicate"
 ]

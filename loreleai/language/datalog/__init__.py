@@ -22,7 +22,8 @@ from ..commons import (
     Procedure,
     Disjunction,
     Recursion,
-    Context
+    Context,
+    FillerPredicate
 )
 from ..lp import ClausalTheory
 
@@ -51,5 +52,6 @@ __all__ = [
     "Procedure",
     "Disjunction",
     "Recursion",
-    "Context"
+    "Context",
+    "FillerPredicate"
 ]
