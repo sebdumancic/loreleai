@@ -20,7 +20,6 @@ from ..commons import (
     Atom,
     Not,
     Clause,
-    are_variables_connected,
     c_fresh_var,
     Literal,
     Procedure,
@@ -31,8 +30,9 @@ from ..commons import (
     list_func,
     List,
     Context,
-    FillerPredicate
+    Body
 )
+
 
 from ..utils import triplet
 
@@ -59,7 +59,6 @@ __all__ = [
     "Clause",
     "Atom",
     "Not",
-    "are_variables_connected",
     "c_fresh_var",
     'triplet',
     'Literal',
@@ -71,5 +70,5 @@ __all__ = [
     "list_func",
     "List",
     "Context",
-    "FillerPredicate"
+    "Body"
 ]

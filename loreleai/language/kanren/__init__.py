@@ -17,14 +17,14 @@ from ..commons import (
     c_fresh_var,
     Atom,
     Clause,
-    are_variables_connected,
     Literal,
     Procedure,
     Disjunction,
     Recursion,
     Context,
-    FillerPredicate
+    Body
 )
+
 from ..lp.lp import ClausalTheory
 
 __all__ = [
@@ -46,12 +46,11 @@ __all__ = [
     "c_fresh_var",
     "Clause",
     "Atom",
-    "are_variables_connected",
     'construct_recursive_rule',
     "Literal",
     "Procedure",
     "Disjunction",
     "Recursion",
     "Context",
-    "FillerPredicate"
+    "Body"
 ]

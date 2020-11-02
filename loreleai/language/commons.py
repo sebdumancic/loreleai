@@ -1,14 +1,12 @@
 from abc import ABC
 from dataclasses import dataclass
 from functools import reduce
-from itertools import combinations
 from typing import Dict, Tuple, Sequence, Set, Union
 
 import kanren
-import networkx as nx
 import z3
 
-#from loreleai.language import MUZ, KANREN_LOGPY
+# from loreleai.language import MUZ, KANREN_LOGPY
 
 MUZ = "muz"
 LP = 1
@@ -213,7 +211,6 @@ class Variable(Term):
 
 
 class Functor:
-
     def __init__(self, name: str, arity: int, types: Sequence[Type] = None):
         self._name: str = name
         self._arity: int = arity
@@ -237,7 +234,9 @@ class Functor:
     def __repr__(self):
         return self._name
 
-    def __call__(self, *args: Union[str, "Constant", "Variable", "Structure", "List", int, float]) -> "Structure":
+    def __call__(
+        self, *args: Union[str, "Constant", "Variable", "Structure", "List", int, float]
+    ) -> "Structure":
         args_to_use = []
         global global_context
         elem: Union[str, "Constant", "Variable", "Structure", "List", int, float]
@@ -255,7 +254,9 @@ class Functor:
             elif isinstance(elem, (Constant, Variable, Structure, List, int, float)):
                 args_to_use.append(elem)
             else:
-                raise Exception(f"don't know how to convert {type(elem)} {elem} to term")
+                raise Exception(
+                    f"don't know how to convert {type(elem)} {elem} to term"
+                )
 
         return Structure(self, args_to_use)
 
@@ -318,7 +319,6 @@ list_func = Functor(".", 2)
 
 
 class List(Structure):
-
     def __init__(self, elements: Sequence[Union[Term, int, float]]):
         argsToUse = []
         for elem in elements:
@@ -331,7 +331,9 @@ class List(Structure):
             elif isinstance(elem, (int, float)):
                 argsToUse.append(elem)
             else:
-                raise Exception(f"Predicate:Don't know how to convert {type(elem)} {elem} to term")
+                raise Exception(
+                    f"Predicate:Don't know how to convert {type(elem)} {elem} to term"
+                )
         super(List, self).__init__(list_func, argsToUse)
 
     def __repr__(self):
@@ -402,17 +404,20 @@ class Predicate:
             return False
 
     def __repr__(self):
-        return "{}({})".format(
-            self.name, ",".join([str(x) for x in self.argument_types])
-        )
+        # return "{}({})".format(
+        #     self.name, ",".join([str(x) for x in self.argument_types])
+        # )
+        return self.name
 
     def __hash__(self):
         if self.hash_cache is None:
             self.hash_cache = hash(self.__repr__())
         return self.hash_cache
 
-    def _map_to_object(self, name: str, arg_position: int) -> Union[Constant, Variable, Structure]:
-        if '(' in name:
+    def _map_to_object(
+        self, name: str, arg_position: int
+    ) -> Union[Constant, Variable, Structure]:
+        if "(" in name:
             raise Exception("automatically converting to structure not yet supported")
         elif name.islower():
             return c_const(name, self.argument_types[arg_position])
@@ -426,52 +431,17 @@ class Predicate:
         assert all([isinstance(x, (Constant, Variable, Structure, str)) for x in args])
         global global_context
 
-        args = [x if isinstance(x, (Constant, Variable, Structure)) else self._map_to_object(x, ind) for ind, x in enumerate(args)]
+        args = [
+            x
+            if isinstance(x, (Constant, Variable, Structure))
+            else self._map_to_object(x, ind)
+            for ind, x in enumerate(args)
+        ]
 
         return Atom(self, list(args))
 
 
-class Formula:
-    def __init__(self):
-        self._properties = {}
-        self._hash_cache = None
-
-    def substitute(self, term_map: Dict[Term, Term]):
-        raise Exception("Not implemented yet!")
-
-    def get_variables(self):
-        raise Exception("Not implemented yet!")
-
-    def get_terms(self):
-        raise Exception("Not implemented yet!")
-
-    def get_predicates(self) -> Set[Predicate]:
-        raise Exception("Not implemented yet!")
-
-    def add_property(self, property_name: str, value):
-        self._properties[property_name] = value
-
-    def get_property(self, property_name: str):
-        return self._properties.get(property_name, None)
-
-    def has_singleton_var(self) -> bool:
-        raise Exception("Not implemented yet!")
-
-    def as_muz(self):
-        raise NotImplementedError()
-
-    def as_kanren(self, base_case_recursion=None):
-        raise NotImplementedError()
-
-    def __hash__(self):
-        if self._hash_cache is None:
-            self._hash_cache = hash(self.__repr__())
-
-        return self._hash_cache
-
-
 class Literal(ABC):
-
     def __init__(self):
         self._properties: Dict = {}
         self._hash_cache: int = None
@@ -497,7 +467,9 @@ class Literal(ABC):
 
 @dataclass
 class Atom(Literal):
-    def __init__(self, predicate: Predicate, arguments: Sequence[Union[Term, int, float]]):
+    def __init__(
+        self, predicate: Predicate, arguments: Sequence[Union[Term, int, float]]
+    ):
         super(Atom, self).__init__()
         self.predicate = predicate
         self.arguments = arguments
@@ -590,6 +562,9 @@ class Not(Literal):
     def as_kanren(self, base_case_recursion=None):
         raise Exception("miniKanren does not support negation")
 
+    def __repr__(self):
+        return f"\\+ {str(self.atom)}"
+
     def __hash__(self):
         if self._hash_cache is None:
             self._hash_cache = hash(self.__repr__())
@@ -601,9 +576,41 @@ class Not(Literal):
 class Body:
     def __init__(self, *literals):
         self._literals: Sequence[Union[Atom, Not]] = list(literals)
+        self._hash_cache = None
 
     def get_literals(self) -> Sequence[Union[Atom, Not]]:
         return self._literals
+
+    def get_predicates(self) -> Set[Predicate]:
+        return {x.get_predicate() for x in self._literals}
+
+    def get_variables(self) -> Sequence[Variable]:
+        """
+        Returns the variables of the literals in the body
+        """
+        vars_ordered = []
+        vars_covered = set()
+        for i in range(len(self._literals)):
+            to_add = [
+                x for x in self._literals[i].get_variables() if x not in vars_covered
+            ]
+            vars_ordered += to_add
+            vars_covered = vars_covered.union(to_add)
+
+        return vars_ordered
+
+    def substitute(self, term_map: Dict[Term, Term]):
+        return Body([x.substitute(term_map) for x in self._literals])
+
+    def substitute_predicate(self, old_predicate: Predicate, new_predicate: Predicate):
+        return Body(
+            [
+                x
+                if x.get_predicate() != old_predicate
+                else new_predicate(*x.get_arguments())
+                for x in self._literals
+            ]
+        )
 
     def __and__(self, other) -> "Body":
         if isinstance(other, Literal):
@@ -620,6 +627,39 @@ class Body:
                 f"Body can be constructed only with Atom or Body, not {type(other)}"
             )
 
+    def __add__(self, other):
+        if isinstance(other, Literal):
+            literals = self._literals + [other]
+            return Body(*literals)
+        elif isinstance(other, Predicate):
+            literals = self._literals + [other.as_proposition()]
+            return Body(*literals)
+        elif isinstance(other, Body):
+            literals = self._literals + other.get_literals()
+            return Body(*literals)
+        else:
+            raise Exception(
+                f"Body can be constructed only with Atom or Body, not {type(other)}"
+            )
+
+    def __repr__(self):
+        return f":- {', '.join([str(x) for x in self._literals])}"
+
+    def __len__(self):
+        return len(self._literals)
+
+    def __hash__(self):
+        if self._hash_cache is None:
+            self._hash_cache = hash(self.__repr__())
+
+        return self._hash_cache
+
+    def __eq__(self, other):
+        if isinstance(other, Body) and len(self._literals) == len(other):
+            return all([x == y for x, y in zip(self._literals, other.get_literals())])
+        else:
+            return False
+
 
 @dataclass
 class Clause:
@@ -631,7 +671,11 @@ class Clause:
         body (List(Atom)): list of atoms in the body of the clause
     """
 
-    def __init__(self, head: Union[Atom, Predicate], body: Union[Sequence[Union[Atom,Not]], Body]):
+    def __init__(
+        self,
+        head: Union[Atom, Predicate],
+        body: Union[Sequence[Union[Atom, Not]], Body],
+    ):
         super(Clause, self).__init__()
         if isinstance(head, Predicate):
             self._head: Atom = head.as_proposition()
@@ -639,16 +683,16 @@ class Clause:
             self._head: Atom = head
 
         if isinstance(body, Body):
-            self._body: Sequence[Union[Atom, Not]] = body.get_literals()
+            self._body: Body = body
         else:
-            self._body: Sequence[Union[Atom, Not]] = body
-        #self._body = self._get_atom_order()
+            self._body: Body = Body(*body)
+        # self._body = self._get_atom_order()
         self._terms = set()
         self._repr_cache = None
         self.term_signatures = None
         self.inverted_term_signatures = None
 
-        for lit in self._body:
+        for lit in self._body.get_literals():
             self._terms = self._terms.union(lit.get_terms())
 
     def substitute(self, term_map: Dict[Term, Term]):
@@ -662,40 +706,38 @@ class Clause:
             Return:
                 new clause with the replaced literals
         """
-        return Clause(
-            self._head.substitute(term_map),
-            list(map(lambda x: x.substitute(term_map), self._body)),
-        )
+        return Clause(self._head.substitute(term_map), self._body.substitute(term_map),)
 
     def substitute_head_predicate(self, new_pred: Predicate):
         """
         Replaces the current head predicate with the new one
         """
         assert new_pred.get_arity() == self._head.get_predicate().get_arity()
-        return Clause(
-            new_pred(*self._head.get_arguments()),
-            self._body
-        )
+        return Clause(new_pred(*self._head.get_arguments()), self._body)
 
     def substitute_predicate(self, old_predicate: Predicate, new_predicate: Predicate):
         """
         substitute every occurrence of old_predicate with new_predicate
 
         """
-        new_head = self._head if self._head.get_predicate() != old_predicate else new_predicate(*self._head.get_arguments())
+        new_head = (
+            self._head
+            if self._head.get_predicate() != old_predicate
+            else new_predicate(*self._head.get_arguments())
+        )
 
-        new_body = [
-            x if x.get_predicate() != old_predicate else new_predicate(*x.get_arguments())
-            for x in self._body
-        ]
+        new_body = self._body.substitute_predicate(old_predicate, new_predicate)
 
         return Clause(new_head, new_body)
+
+    def get_body(self) -> Body:
+        return self._body
 
     def get_predicates(self) -> Set[Predicate]:
         """
             Returns the predicates in the clause
         """
-        return set([x.get_predicate() for x in self._body])
+        return self._body.get_predicates()
 
     def get_variables(self) -> Sequence[Variable]:
         """
@@ -717,8 +759,9 @@ class Clause:
         """
         vars_ordered = []
         vars_covered = set()
-        for i in range(len(self._body)):
-            to_add = [x for x in self._body[i].get_variables() if x not in vars_covered]
+        body_lits = self._body.get_literals()
+        for i in range(len(body_lits)):
+            to_add = [x for x in body_lits[i].get_variables() if x not in vars_covered]
             vars_ordered += to_add
             vars_covered = vars_covered.union(to_add)
 
@@ -732,16 +775,20 @@ class Clause:
                 with_predicates (Set[Predicates], optional): return only atoms with these predicates
         """
         if with_predicates is None:
-            return self._body
+            return self._body.get_literals()
         else:
-            return [x for x in self._body if x.get_predicate() in with_predicates]
+            return [
+                x
+                for x in self._body.get_literals()
+                if x.get_predicate() in with_predicates
+            ]
 
     def get_head(self):
         return self._head
 
     def get_term_signatures(self):
         if self.term_signatures is None:
-            self.term_signatures = _create_term_signatures(self._body)
+            self.term_signatures = _create_term_signatures(self._body.get_literals())
             self.inverted_term_signatures = dict(
                 [(frozenset(v.items()), k) for k, v in self.term_signatures.items()]
             )
@@ -755,7 +802,7 @@ class Clause:
                 var_count[v] = 0
             var_count[v] += 1
 
-        for atm in self._body:
+        for atm in self._body.get_literals():
             for v in atm.get_variables():
                 if v not in var_count:
                     var_count[v] = 0
@@ -780,21 +827,23 @@ class Clause:
         return Clause(
             self._head,
             [new_atom.substitute(substitutes)]
-            + [x for x in self._body if x not in atoms_to_replace],
+            + [x for x in self._body.get_literals() if x not in atoms_to_replace],
         )
 
     def is_recursive(self) -> bool:
         """
         Returns true if the clause is recursive
         """
-        return self._head.get_predicate() in [x.get_predicate() for x in self._body]
+        return self._head.get_predicate() in self._body.get_predicates()
 
     def as_muz(self):
-        return self._head.as_muz(), [x.as_muz() for x in self._body]
+        return self._head.as_muz(), [x.as_muz() for x in self._body.get_literals()]
 
     def as_kanren(self, base_case_recursion=None):
         if self.is_recursive():
-            raise Exception(f"recursive rules should not be constructed with .as_kanren() method but should use 'construct_recursive' from kanren package")
+            raise Exception(
+                f"recursive rules should not be constructed with .as_kanren() method but should use 'construct_recursive' from kanren package"
+            )
         # Should associate a conj goal with the predicate in the head
         # has to be a function
         # rename all variables to make sure there are no strange effects
@@ -803,7 +852,7 @@ class Clause:
         head_vars = dict([(x, ind) for ind, x in enumerate(self._head.get_variables())])
 
         # all other arguments need to be bound to their kanren constructs
-        other_args = [x.get_terms() for x in self._body]
+        other_args = [x.get_terms() for x in self._body.get_literals()]
         other_args = set(reduce(lambda x, y: x + y, other_args, []))
         # remove head variables; these should be bounded to the function arguments
         other_args = [x for x in other_args if x not in head_vars]
@@ -811,24 +860,30 @@ class Clause:
         def generic_predicate(*args, core_obj=self, hvars=head_vars, ovars=other_args):
             vars_to_use = dict([(v, kanren.var()) for v in ovars])
             return kanren.conde(
-                [x.get_predicate().as_kanren()(
-                    *[args[hvars[y]] if y in hvars else vars_to_use[y] for y in x.get_terms()]
-                )
-                 for x in core_obj.get_literals()]
+                [
+                    x.get_predicate().as_kanren()(
+                        *[
+                            args[hvars[y]] if y in hvars else vars_to_use[y]
+                            for y in x.get_terms()
+                        ]
+                    )
+                    for x in core_obj.get_literals()
+                ]
             )
 
         return generic_predicate
 
     def __contains__(self, item):
         if isinstance(item, Predicate):
-            return item.get_name() in map(lambda x: x.predicate.name, self._body)
+            return item.get_name() in self._body.get_predicates()
         elif isinstance(item, Atom):
             return (
                 len(
                     [
                         x
-                        for x in self._body
-                        if x.get_predicate().get_name() == item.get_predicate().get_name()
+                        for x in self._body.get_literals()
+                        if x.get_predicate().get_name()
+                        == item.get_predicate().get_name()
                     ]
                 )
                 > 0
@@ -881,9 +936,12 @@ class Clause:
 
     def __repr__(self):
         if self._repr_cache is None:
-            self._repr_cache = "{} :- {}".format(
-                self._head, ",".join([str(x) for x in self._body])
-            )
+            if len(self._body):
+                self._repr_cache = "{} :- {}".format(
+                    self._head, ",".join([str(x) for x in self._body.get_literals()])
+                )
+            else:
+                self._repr_cache = f"{self._head}"
         return self._repr_cache
 
     def __hash__(self):
@@ -893,7 +951,7 @@ class Clause:
                 if var not in var_map:
                     var_map[var] = len(var_map)
 
-            for atm in self._body:
+            for atm in self._body.get_literals():
                 for v in atm.get_variables():
                     if v not in var_map:
                         var_map[v] = len(var_map)
@@ -901,7 +959,7 @@ class Clause:
             head_rep = f"{self._head.get_predicate().get_name()}({','.join([str(var_map[x] for x in self._head.get_variables())])})"
             bodies = [
                 f"{x.get_predicate().get_name()}({','.join([str(var_map[t]) if t in var_map else str(t) for t in x.get_terms()])})"
-                for x in self._body
+                for x in self._body.get_literals()
             ]
             bodies = ",".join(bodies)
 
@@ -909,10 +967,15 @@ class Clause:
 
         return self._hash_cache  # hash(self.__repr__())
 
+    def __eq__(self, other):
+        if isinstance(other, Clause) and len(self) == len(other):
+            return True if self._head == other.get_head() and self._body == other.get_body() else False
+        else:
+            return False
+
 
 @dataclass
 class Procedure:
-
     def __init__(self, clauses: Sequence[Clause]):
         self._clauses = clauses
 
@@ -924,9 +987,15 @@ class Procedure:
 
         for ind in range(len(self._clauses)):
             if isinstance(self._clauses[ind], Disjunction):
-                new_clauses.append(self._clauses[ind].substitute_head_predicate(new_pred))
+                new_clauses.append(
+                    self._clauses[ind].substitute_head_predicate(new_pred)
+                )
             else:
-                new_clauses.append(self._clauses[ind].substitute_predicate(self._clauses[ind].get_head().get_predicate()), new_pred)
+                new_clauses.append(
+                    self._clauses[ind].substitute_predicate(
+                        self._clauses[ind].get_head().get_predicate(), new_pred
+                    )
+                )
 
         if isinstance(self, Disjunction):
             return Disjunction(new_clauses)
@@ -937,7 +1006,9 @@ class Procedure:
         new_clauses = []
 
         for ind in range(len(self._clauses)):
-            new_clauses.append(self._clauses[ind].substitute_predicate(old_predicate, new_predicate))
+            new_clauses.append(
+                self._clauses[ind].substitute_predicate(old_predicate, new_predicate)
+            )
 
         if isinstance(self, Disjunction):
             return Disjunction(new_clauses)
@@ -946,22 +1017,28 @@ class Procedure:
 
 
 class Disjunction(Procedure):
-
     def __init__(self, clauses: Sequence[Clause]):
         super().__init__(clauses)
 
 
 class Recursion(Procedure):
-
     def __init__(self, clauses: Sequence[Clause]):
         super().__init__(clauses)
+
+    def get_base_case(self) -> Sequence[Clause]:
+        return [x for x in self._clauses if not x.is_recursive()]
+
+    def get_recursive_case(self) -> Sequence[Clause]:
+        return [x for x in self._clauses if x.is_recursive()]
 
 
 class Program:
     def __init__(self, clauses: Sequence[Union[Clause, Procedure, Atom]]):
         self._clauses: Sequence[Union[Clause, Procedure, Atom]] = clauses
 
-    def get_clauses(self, predicates: Set[Predicate] = None) -> Sequence[Union[Clause, Procedure, Atom]]:
+    def get_clauses(
+        self, predicates: Set[Predicate] = None
+    ) -> Sequence[Union[Clause, Procedure, Atom]]:
         if predicates:
             return [x for x in self._clauses if any([p for p in x.get_predicates()])]
         else:
@@ -985,10 +1062,9 @@ class Context:
         self._literals = {}  # Predicate -> { tuple of terms -> Atom}
         self._domains = {"thing": Type("thing")}  # name -> Type
         self._id_to_constant = {}  # domain (str) -> {id -> Constant}
-        self._functors = {} # arity -> name -> Functor
+        self._functors = {2: {}}  # arity -> name -> Functor
 
-        self._functors[2] = {}
-        self._functors[2]['.'] = list_func
+        self._functors[2]["."] = list_func
 
     def _predicate_sig(self, name, arity):
         return f"{name}/{arity}"
@@ -997,11 +1073,15 @@ class Context:
         return [v for k, v in self._predicates.items()]
 
     def get_constants(self) -> Sequence[Constant]:
-        p = [[v for k,v in self._constants[z].items()] for z in self._constants]
-        return reduce(lambda x,y: x + y, p, [])
+        p = [[v for k, v in self._constants[z].items()] for z in self._constants]
+        return reduce(lambda x, y: x + y, p, [])
 
     def get_variables(self) -> Sequence[Variable]:
-        return reduce(lambda x, y: x + y, [[v for k, v in self._variables[z].items()] for z in self._variables], [])
+        return reduce(
+            lambda x, y: x + y,
+            [[v for k, v in self._variables[z].items()] for z in self._variables],
+            [],
+        )
 
     def get_types(self) -> Sequence[Type]:
         return [v for k, v in self._domains.items()]
@@ -1057,7 +1137,7 @@ class Context:
             else:
                 v_id += 1
 
-        return self.variable( f"_V{v_id}", domain)
+        return self.variable(f"_V{v_id}", domain)
 
     def constant(self, name, domain=None) -> Constant:
         if domain is None:
@@ -1105,14 +1185,21 @@ class Context:
     def functor(self, name: str, arity: int = None, types: Sequence[Type] = None):
         # check if already exists
         found = []
-        for ar in [arity] if (arity is not None and arity in self._functors) else self._functors:
+        for ar in (
+            [arity]
+            if (arity is not None and arity in self._functors)
+            else self._functors
+        ):
             if name in self._functors[ar]:
                 found.append(self._functors[ar][name])
         if len(found) == 1:
             return found[0]
         else:
             # if doesn't exist
-            assert(arity is not None or types is not None, "creating new functor requires either arity or argument types")
+            assert (
+                arity is not None or types is not None,
+                "creating new functor requires either arity or argument types",
+            )
             if types is None:
                 if arity not in self._functors:
                     self._functors[arity] = {}
@@ -1179,92 +1266,33 @@ def c_literal(
     return ctx.literal(predicate, arguments)
 
 
-def c_fresh_var(
-        domain=None,
-        ctx: Context = None
-) -> Variable:
+def c_fresh_var(domain=None, ctx: Context = None) -> Variable:
     ctx = _get_proper_context(ctx)
     return ctx.fresh_variable(domain=domain)
 
 
-def c_find_domain(
-        const: Union[str, Constant],
-        ctx: Context = None
-) -> Type:
+def c_find_domain(const: Union[str, Constant], ctx: Context = None) -> Type:
     ctx = _get_proper_context(ctx)
     return ctx.find_domain(const)
 
 
-def c_type(
-        name: str,
-        ctx: Context = None
-) -> Type:
+def c_type(name: str, ctx: Context = None) -> Type:
     ctx = _get_proper_context(ctx)
     return ctx.type(name)
 
 
 def c_functor(
-        name: str,
-        arity: int = None,
-        types: Sequence[Type] = None,
-        ctx: Context = None
+    name: str, arity: int = None, types: Sequence[Type] = None, ctx: Context = None
 ) -> Functor:
     ctx = _get_proper_context(ctx)
     return ctx.functor(name, arity, types)
 
 
 def c_symbol(
-        name: str,
-        arity: int = None,
-        types: Sequence[Type] = None,
-        ctx: Context = None
+    name: str, arity: int = None, types: Sequence[Type] = None, ctx: Context = None
 ) -> Union[Term, Functor, Predicate]:
     ctx = _get_proper_context(ctx)
     return ctx.symbol(name, arity, types)
-
-
-class FillerPredicate:
-
-    def __init__(self, prefix_name: str, arity: int):
-        self._prefix_name = prefix_name
-        self._arity = arity
-        self._instance_counter = 0
-
-    def new(self, argument_types: Sequence[Type] = None) -> "Predicate":
-        """
-        Creates a new predicate from the template
-        """
-        self._instance_counter += 1
-
-        if argument_types is None:
-            return c_pred(f"{self._prefix_name}_{self._instance_counter}", self._arity)
-        else:
-            assert len(argument_types) == self._arity
-            return c_pred(f"{self._prefix_name}_{self._instance_counter}", self._arity, argument_types)
-
-
-def are_variables_connected(atoms: Sequence[Atom]):
-    """
-    Checks whether the Variables in the clause are connected
-
-    Args:
-        atoms (Sequence[Atom]): atoms whose variables have to be checked
-
-    """
-    g = nx.Graph()
-
-    for atm in atoms:
-        vrs = atm.get_variables()
-        if len(vrs) == 1:
-            g.add_node(vrs[0])
-        else:
-            for cmb in combinations(vrs, 2):
-                g.add_edge(cmb[0], cmb[1])
-
-    res = nx.is_connected(g)
-    del g
-
-    return res
 
 
 def _are_two_set_of_literals_identical(

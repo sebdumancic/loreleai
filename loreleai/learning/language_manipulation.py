@@ -1,5 +1,5 @@
 import typing
-from itertools import product
+from itertools import product, combinations_with_replacement
 
 from loreleai.language.lp import (
     Clause,
@@ -11,6 +11,7 @@ from loreleai.language.lp import (
     Disjunction,
     Recursion,
     Not,
+    Body
 )
 
 INPUT_ARG = 1
@@ -40,8 +41,8 @@ def new_variable(
 
 
 def _plain_extend_clause(
-    clause: Clause, predicate: Predicate, connected_clause: bool = True
-) -> typing.Sequence[Clause]:
+    clause: typing.Union[Clause, Body], predicate: Predicate, connected_clause: bool = True
+) -> typing.Sequence[typing.Union[Clause, Body]]:
     """
     Extends the clause with the predicate in every possible way (no bias)
 
@@ -49,6 +50,15 @@ def _plain_extend_clause(
         clause: a clause to be extended
         predicate: a predicate to add to the clause
     """
+    if isinstance(clause, Body) and len(clause) == 0:
+        head_variables = [chr(x) for x in range(ord("A"), ord("Z"))][: predicate.get_arity()]
+        possible_heads = [
+            Body(predicate(*list(x)))
+            for x in combinations_with_replacement(head_variables, predicate.get_arity())
+        ]
+
+        return possible_heads
+
     clause_variables: typing.Sequence[Variable] = clause.get_variables()
     used_variables = {x for x in clause_variables}
     pred_argument_types: typing.Sequence[Type] = predicate.get_arg_types()
@@ -71,7 +81,7 @@ def _plain_extend_clause(
 
     # do cross product of matches
     base_sets = [argument_matches[x] for x in range(len(pred_argument_types))]
-    candidates: typing.List[Clause] = []
+    candidates: typing.List[typing.Union[Clause, Body]] = []
 
     for arg_combo in product(*base_sets):
         new_clause = None
@@ -90,12 +100,15 @@ def _plain_extend_clause(
 
 
 def _plain_extend_negation_clause(
-    clause: Clause, predicate: Predicate
-) -> typing.Sequence[Clause]:
+    clause: typing.Union[Clause, Body], predicate: Predicate
+) -> typing.Sequence[typing.Union[Clause, Body]]:
     """
     Extends a clause with the negation of a predicate (no new variables allowed)
     """
-    suitable_vars = clause.get_body_variables()
+    if isinstance(clause, Body):
+        suitable_vars = clause.get_variables()
+    else:
+        suitable_vars = clause.get_body_variables()
     pred_argument_types: typing.Sequence[Type] = predicate.get_arg_types()
     argument_matches = {}
 
@@ -108,7 +121,7 @@ def _plain_extend_negation_clause(
                 argument_matches[arg_ind].append(suitable_vars[clv_ind])
 
     base_sets = [argument_matches[x] for x in range(len(pred_argument_types))]
-    candidates: typing.List[Clause] = []
+    candidates: typing.List[typing.Union[Clause, Body]] = []
 
     for arg_combo in product(*base_sets):
         new_clause = clause + Not(predicate(*list(arg_combo)))
@@ -118,17 +131,17 @@ def _plain_extend_negation_clause(
 
 
 def plain_extension(
-    clause: typing.Union[Clause, Procedure],
+    clause: typing.Union[Clause, Body, Procedure],
     predicate: Predicate,
     connected_clauses: bool = True,
     negated: bool = False,
-) -> typing.Sequence[typing.Union[Clause, Procedure]]:
+) -> typing.Sequence[typing.Union[Clause, Body, Procedure]]:
     """
     Extends a clause or a procedure without any bias. Only checks for variable type match.
     Adds the predicate to the clause/procedure
 
     """
-    if isinstance(clause, Clause):
+    if isinstance(clause, (Clause, Body)):
         if negated:
             return _plain_extend_negation_clause(clause, predicate)
         else:

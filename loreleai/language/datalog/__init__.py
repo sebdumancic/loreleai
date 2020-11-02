@@ -17,14 +17,14 @@ from ..commons import (
     c_find_domain,
     Atom,
     Clause,
-    are_variables_connected,
     Literal,
     Procedure,
     Disjunction,
     Recursion,
     Context,
-    FillerPredicate
+    Body
 )
+
 from ..lp import ClausalTheory
 
 __all__ = [
@@ -47,11 +47,10 @@ __all__ = [
     "c_find_domain",
     "Clause",
     "Atom",
-    "are_variables_connected",
     "Literal",
     "Procedure",
     "Disjunction",
     "Recursion",
     "Context",
-    "FillerPredicate"
+    "Body"
 ]
