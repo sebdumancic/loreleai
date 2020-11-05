@@ -24,6 +24,8 @@ class HypothesisSpace(ABC):
         head_constructor: typing.Union[Predicate, FillerPredicate],
         connected_clauses: bool = True,
         recursive_procedures: bool = False,
+        expansion_hooks_keep: typing.Sequence = (),
+        expansion_hooks_reject: typing.Sequence = ()
     ) -> None:
         self._primitives: typing.Sequence = primitives
         self._head_constructor: typing.Union[
@@ -107,6 +109,8 @@ class TopDownHypothesisSpace(HypothesisSpace):
         connected_clauses: bool = True,
         recursive_procedures: bool = False,
         repetitions_in_head_variables: int = 2,
+        expansion_hooks_keep: typing.Sequence = (),
+        expansion_hooks_reject: typing.Sequence = ()
     ):
         super().__init__(
             primitives,
@@ -120,6 +124,8 @@ class TopDownHypothesisSpace(HypothesisSpace):
         self._invented_predicate_count = 0
         self._recursive_pointers_count = 0
         self._recursive_pointer_prefix = "rec"
+        self._expansion_hooks_keep = expansion_hooks_keep
+        self._expansion_hooks_reject = expansion_hooks_reject
         self.initialise()
 
     def initialise(self) -> None:
@@ -209,9 +215,11 @@ class TopDownHypothesisSpace(HypothesisSpace):
                 else False
             )
 
-    def _insert_node(self, node: typing.Union[Body]) -> None:
+    def _insert_node(self, node: typing.Union[Body]) -> bool:
         """
         Inserts a clause/procedure into the hypothesis space
+
+        Returns True if successfully inserted (after applying hooks), otherwise returns False
         """
         recursive = self._check_if_recursive(node)
 
@@ -228,28 +236,41 @@ class TopDownHypothesisSpace(HypothesisSpace):
         else:
             possible_heads = self._create_possible_heads(node)
 
-        init_head_dict = {"ignored": False, "blocked": False, "visited": False}
-        possible_heads = dict([(x, init_head_dict.copy()) for x in possible_heads])
+        # if expansion  hooks available, check if the heads pass
+        if self._expansion_hooks_keep:
+            possible_heads = [x for x in possible_heads if all([f(x, node) for f in self._expansion_hooks_keep])]
 
-        self._hypothesis_space.add_node(
-            node, last_visited_from=None, heads=possible_heads
-        )
+        # if rejection hooks are available, check if the heads fail
+        if self._expansion_hooks_reject:
+            possible_heads = [x for x in possible_heads if not any([f(x, node) for f in self._expansion_hooks_reject])]
 
-        if recursive:
-            self._recursive_pointers_count += 1
-            pointer_name = (
-                f"{self._recursive_pointer_prefix}{self._recursive_pointers_count}"
+        if possible_heads:
+            init_head_dict = {"ignored": False, "blocked": False, "visited": False}
+            possible_heads = dict([(x, init_head_dict.copy()) for x in possible_heads])
+
+            self._hypothesis_space.add_node(
+                node, last_visited_from=None, heads=possible_heads
             )
-            self.register_pointer(pointer_name, self._root_node)
-            self._hypothesis_space.nodes[node]["partner"] = pointer_name
-            self._hypothesis_space.nodes[node]["blocked"] = True
+
+            if recursive:
+                self._recursive_pointers_count += 1
+                pointer_name = (
+                    f"{self._recursive_pointer_prefix}{self._recursive_pointers_count}"
+                )
+                self.register_pointer(pointer_name, self._root_node)
+                self._hypothesis_space.nodes[node]["partner"] = pointer_name
+                self._hypothesis_space.nodes[node]["blocked"] = True
+
+            return True
+        else:
+            return False
 
     def _insert_edge(self, parent: Body, child: Body,) -> None:
         """
         Inserts a directed edge between two clauses/procedures in the hypothesis space
         """
-        if child not in self._hypothesis_space.nodes:
-            self._insert_node(child)
+        # if child not in self._hypothesis_space.nodes:
+        #     self._insert_node(child)
         self._hypothesis_space.add_edge(parent, child)
 
     def register_pointer(self, name: str, init_value: Body = None):
@@ -287,6 +308,17 @@ class TopDownHypothesisSpace(HypothesisSpace):
 
         expansions = list(expansions)
 
+        # add expansions to the hypothesis space
+        # if self._insert_node returns False, forget the expansion
+        expansions_to_consider = []
+        for exp_ind in range(len(expansions)):
+            r = self._insert_node(expansions[exp_ind])
+            if r:
+                expansions_to_consider.append(expansions[exp_ind])
+
+        expansions = expansions_to_consider
+
+        # add edges
         for ind in range(len(expansions)):
             self._insert_edge(node, expansions[ind])
 

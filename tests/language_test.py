@@ -1,4 +1,7 @@
-from loreleai.language.lp import c_var, c_pred, c_const, Predicate, Constant, Variable, Clause, Atom
+from loreleai.language.lp import c_var, c_pred, c_const, Predicate, Constant, Variable, Clause, Atom, Disjunction
+from loreleai.learning.hypothesis_space import TopDownHypothesisSpace
+from loreleai.learning.language_filtering import has_singleton_vars, connected_clause
+from loreleai.learning.language_manipulation import plain_extension
 
 
 class LanguageTest:
@@ -56,8 +59,114 @@ class LanguageTest:
         assert isinstance(f3.arguments[1], Variable)
 
 
+class LanguageManipulationTest:
+
+    def plain_clause_extensions(self):
+        parent = c_pred("parent", 2)
+        grandparent = c_pred("grandparent", 2)
+
+        cl1 = grandparent("X", "Y") <= parent("X", "Z")
+
+        extensions = plain_extension(cl1, parent, connected_clauses=False)
+
+        assert len(extensions) == 16
+
+    def plain_clause_extensions_connected(self):
+        parent = c_pred("parent", 2)
+        grandparent = c_pred("grandparent", 2)
+
+        cl1 = grandparent("X", "Y") <= parent("X", "Z")
+
+        extensions = plain_extension(cl1, parent, connected_clauses=True)
+
+        assert len(extensions) == 15
+
+    def plain_procedure_extension(self):
+        parent = c_pred("parent", 2)
+        ancestor = c_pred("ancestor", 2)
+
+        cl1 = ancestor("X", "Y") <= parent("X", "Y")
+        cl2 = ancestor("X", "Y") <= parent("X", "Z") & parent("Z", "Y")
+
+        proc = Disjunction([cl1, cl2])
+
+        extensions = plain_extension(proc, parent, connected_clauses=False)
+
+        assert len(extensions) == 25
+
+
+class HypothesisSpace():
+
+    def top_down_plain(self):
+        grandparent = c_pred("grandparent", 2)
+        father = c_pred("father", 2)
+        mother = c_pred("mother", 2)
+
+        hs = TopDownHypothesisSpace(primitives=[lambda x: plain_extension(x, father),
+                                                lambda x: plain_extension(x, mother)],
+                                    head_constructor=grandparent)
+
+        current_cand = hs.get_current_candidate()
+        assert len(current_cand) == 3
+
+        expansions = hs.expand(current_cand[0])
+        assert len(expansions) == 6
+
+        expansions_2 = hs.expand(expansions[0])
+        assert len(expansions_2) == 10
+
+        expansions3 = hs.expand(expansions[1])
+        assert len(expansions3) == 32
+
+        hs.block(expansions[2])
+        expansions4 = hs.expand(expansions[2])
+        assert len(expansions4) == 0
+
+        hs.remove(expansions[3])
+        expansions5 = hs.get_successors_of(current_cand[0])
+        assert len(expansions5) == 5
+
+        hs.move_pointer_to(expansions[1])
+        current_cand = hs.get_current_candidate()
+        assert current_cand[0] == expansions[1]
+
+        hs.ignore(expansions[4])
+        hs.move_pointer_to(expansions[4])
+        expansions6 = hs.get_current_candidate()
+        assert len(expansions6) == 0
+
+    def top_down_limited(self):
+        grandparent = c_pred("grandparent", 2)
+        father = c_pred("father", 2)
+        mother = c_pred("mother", 2)
+
+        hs = TopDownHypothesisSpace(primitives=[lambda x: plain_extension(x, father, connected_clauses=False),
+                                                lambda x: plain_extension(x, mother, connected_clauses=False)],
+                                    head_constructor=grandparent,
+                                    expansion_hooks_keep=[lambda x, y: connected_clause(x, y)],
+                                    expansion_hooks_reject=[lambda x, y: has_singleton_vars(x, y)])
+
+        current_cand = hs.get_current_candidate()
+        assert len(current_cand) == 3
+
+        expansions = hs.expand(current_cand[1])
+        assert len(expansions) == 6
+
+        expansion2 = hs.expand(expansions[1])
+        assert len(expansion2) == 16
+
+
 def test_language():
-    test = LanguageTest()
-    test.manual_constructs()
+    #test = LanguageTest()
+    # test.manual_constructs()
+
+    #test_bias = LanguageManipulationTest()
+    # test_bias.plain_clause_extensions()
+    # test_bias.plain_clause_extensions_connected()
+    #test_bias.plain_procedure_extension()
+
+    test_hypothesis_space = HypothesisSpace()
+    #test_hypothesis_space.top_down_plain()
+    test_hypothesis_space.top_down_limited()
 
 test_language()
