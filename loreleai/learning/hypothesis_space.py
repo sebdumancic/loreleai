@@ -37,6 +37,8 @@ class HypothesisSpace(ABC):
         self._connected_clauses = connected_clauses
         self._use_recursions = recursive_procedures
         self._pointers: typing.Dict[str, Body] = {"main": None}
+        self._expansion_hooks_keep = expansion_hooks_keep
+        self._expansion_hooks_reject = expansion_hooks_reject
 
     @abstractmethod
     def initialise(self) -> None:
@@ -63,6 +65,14 @@ class HypothesisSpace(ABC):
     def ignore(self, node: typing.Union[Clause, Procedure]) -> None:
         """
         Ignores the node, but keeps extending it
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def remove(self, node: typing.Union[Clause, Procedure], remove_entire_body: bool = False,
+            not_if_other_parents: bool = True) -> None:
+        """
+        Removes the clause from the hypothesis space
         """
         raise NotImplementedError()
 
@@ -117,6 +127,8 @@ class TopDownHypothesisSpace(HypothesisSpace):
             head_constructor,
             recursive_procedures=recursive_procedures,
             connected_clauses=connected_clauses,
+            expansion_hooks_keep=expansion_hooks_keep,
+            expansion_hooks_reject=expansion_hooks_reject
         )
         self._hypothesis_space = nx.DiGraph()
         self._root_node: Body = None
@@ -124,8 +136,6 @@ class TopDownHypothesisSpace(HypothesisSpace):
         self._invented_predicate_count = 0
         self._recursive_pointers_count = 0
         self._recursive_pointer_prefix = "rec"
-        self._expansion_hooks_keep = expansion_hooks_keep
-        self._expansion_hooks_reject = expansion_hooks_reject
         self.initialise()
 
     def initialise(self) -> None:
@@ -372,6 +382,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
         """
         Blocks the expansions of the body (but keeps it in the hypothesis space)
         """
+        # TODO: make it possible to block only specific clause
         clause = (
             node
             if isinstance(node, Clause)
@@ -432,6 +443,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
         """
         Sets the node to be ignored. That is, the node will be expanded, but not taken into account as a candidate
         """
+        # TODO: make it possible to ignore the entire body
         clause = (
             node
             if isinstance(node, Clause)
@@ -571,6 +583,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
         :param node:
         :return:
         """
+        # TODO: make it possible to get all predecessors, not just the last visited from
         if isinstance(node, Body):
             return self._hypothesis_space.nodes[node]["last_visited_from"]
         else:
