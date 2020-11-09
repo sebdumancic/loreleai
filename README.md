@@ -2,9 +2,22 @@
 Lorelai aims to be Keras for **Lo**gical **re**asoning and **le**arning in AI.
 It provides a unified language for expressing logical theories and connects it to various backends (Prolog, Answer Set Programming, Datalog, ...) to reason with the provided theories.
 
+# Installation
+
+`loreleai` depends on [pylo](https://github.com/sebdumancic/pylo2) to interface with Prolog engines.
+Follow the instructions to install `pylo` [here](https://github.com/sebdumancic/pylo2).
+
+If you will be using a Datalog engine, follow the instructions to install [z3](https://github.com/Z3Prover/z3).
+
+Then clone this repository and run
+```shell script
+pip install .
+```
+
+
 
 # Quick start
-Loreleai allows you to easy specify you knowledge and ask queries about it
+`loreleai` allows you to easy specify you knowledge and ask queries about it
 
 ```python
 from loreleai.language.lp import c_const, c_var, c_pred
@@ -34,11 +47,11 @@ solver.assert_fact(f2)
 solver.assert_rule(cl)                  # assert a rule
 
 solver.has_solution(grandparent(p1, p3))# ask whether there is a solution to a query
-solver.all_solutions(parent(V1, V2))    # ask for all solutions
-solver.one_solution(grandparent(p1, V1))# ask for a single solution
+solver.query(parent(V1, V2))    # ask for all solutions
+solver.query(grandparent(p1, V1), max_solutions=1)# ask for a single solution
 ```
 
-Alternatively, `Loreleai` provides shortcuts to defining facts
+Alternatively, `loreleai` provides shortcuts to defining facts
 ```python
 from loreleai.language.lp import  c_pred
 
@@ -55,17 +68,11 @@ query_literal = grandparent("p1", "X")  # 'X' is automatically parsed into a Var
 
 ### Prolog
 
-Currently supported:
- - none yet
+Currently supported (via [pylo](https://github.com/sebdumancic/pylo2)):
+ - [SWI Prolog](https://www.swi-prolog.org/)
+ - [XSB Prolog](http://xsb.sourceforge.net/)
+ - [GNU Prolog](http://www.gprolog.org/)
  
-Considering:
- - primitive [SWI Prolog](https://www.swi-prolog.org/) commandline interface
- - [Pyrolog](https://bitbucket.org/cfbolz/pyrolog/src/default/)
- - [sPyrolog](https://github.com/leonweber/spyrolog)  (makes Pyrolog redundant?)
- - an actual SWI Prolog wrapper (to be made from scratch) [link1](https://www.swi-prolog.org/pldoc/man?section=calling-prolog-from-c) [link2](https://www.swi-prolog.org/pldoc/doc_for?object=section(%27packages/pl2cpp.html%27))
- - [Ciao prolog](https://ciao-lang.org/); support for foreign functions is better explained [link](https://ciao-lang.org/ciao/build/doc/ciao.html/foreign_interface_doc.html)
- - wrap around existing Java interfaces through Jython?
- - [composition of interpreters](https://soft-dev.org/pubs/html/barrett_bolz_tratt__approaches_to_interpreter_composition/) 
 
 ### Relational programming
 Prolog without side-effects (cut and so on)
@@ -73,10 +80,6 @@ Prolog without side-effects (cut and so on)
 Currently supported:
  - [miniKanren](https://github.com/pythological/kanren); seems to be actively maintained
  
-Considering:
- - [logpy](https://github.com/logpy/logpy) (pre-decessor of miniKanren?)
- - [microkanren](https://github.com/ethframe/microkanren)
- - [microkanrenpy](https://microkanrenpy.readthedocs.io/en/latest/index.html)
  
 ### Datalog
 A subset of Prolog without functors/structures
@@ -113,12 +116,12 @@ Considering:
 
 ### First direction: reasoning engines
 
- - integrate one solver for each of the representative categories
- - add support for external predicates (functionality specified in Python)
- - SWI prolog wrapper
- - include probabilistic engines (Problog, PSL, MLNs)
- - add parsers for each dialect
- - different ways of loading data (input language, CSV, ...)
+ - [x] integrate one solver for each of the representative categories
+ - [ ] add support for external predicates (functionality specified in Python)
+ - [x] SWI prolog wrapper
+ - [ ] include probabilistic engines (Problog, PSL, MLNs)
+ - [ ] add parsers for each dialect
+ - [ ] different ways of loading data (input language, CSV, ...)
  
 
 
