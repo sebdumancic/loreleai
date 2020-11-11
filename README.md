@@ -2,6 +2,8 @@
 Lorelai aims to be Keras for **Lo**gical **re**asoning and **le**arning in AI.
 It provides a unified language for expressing logical theories and connects it to various backends (Prolog, Answer Set Programming, Datalog, ...) to reason with the provided theories.
 
+**THIS IS STILL WORK IN PROGRESS, EXPECT CHANGES!**
+
 # Installation
 
 `loreleai` depends on [pylo](https://github.com/sebdumancic/pylo2) to interface with Prolog engines.
@@ -18,6 +20,8 @@ pip install .
 
 # Quick start
 `loreleai` allows you to easy specify you knowledge and ask queries about it
+
+**More details:** for more details on usage of logic and Prolog engines, check the instructions of [pylo](https://github.com/sebdumancic/pylo2)
 
 ```python
 from loreleai.language.lp import c_const, c_var, c_pred
@@ -41,7 +45,7 @@ V3 = c_var("Z")
 cl = (grandparent(V1, V3) <= parent(V1, V2) & parent(V2, V3))
 
 solver = MuZ()                          # instantiate the solver
-                                        # Z3 datalog (muZ)
+                                        # Z3 datalog (muZ)I pro
 solver.assert_fact(f1)                  # assert a fact
 solver.assert_fact(f2)
 solver.assert_rule(cl)                  # assert a rule
@@ -63,6 +67,17 @@ f2 = parent("p2", "p3")
 
 query_literal = grandparent("p1", "X")  # 'X' is automatically parsed into a Variable
 ```
+
+Reasoning engines are located in `loreleai.reasoning.lp` followed by the specific type of logic programming
+  - `prolog`: supported Prolog engines:
+    - `SWIProlog` for SWI Prolog
+    - `GNUProlog` for GNU Prolog
+    - `XSBProlog` for XSB Prolog
+  - `datalog`: supported Datalog engines:
+    - `MuZ` for Z3's datalog engine
+  - `kanren`: for relational programming
+    - `MiniKanren`
+    
 
 # Supported reasoning engines
 
