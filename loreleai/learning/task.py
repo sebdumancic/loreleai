@@ -1,5 +1,5 @@
 from functools import reduce
-from typing import Union, List, Sequence
+from typing import Union, List, Sequence, Tuple, Set
 
 from loreleai.language.lp import Atom, Clause, Procedure, Program
 
@@ -21,6 +21,15 @@ class Knowledge:
     def add(self, *piece: Union[Atom, Clause, Procedure, Program]) -> None:
         map(lambda x: self._add(x), piece)
 
+    def get_all(self):
+        return self._knowledge_pieces
+
+    def get_clauses(self):
+        return [x for x in self._knowledge_pieces if isinstance(x, (Clause, Procedure))]
+
+    def get_atoms(self):
+        return [x for x in self._knowledge_pieces if isinstance(x, Atom)]
+
 
 class Interpretation:
 
@@ -33,20 +42,13 @@ class Interpretation:
 
 class Task:
 
-    def __init__(self, *examples: Union[Atom, Interpretation]):
-        self._examples: Sequence[Union[Atom, Interpretation]] = examples
+    def __init__(self, positive_examples: Set[Atom] = None, negative_examples: Set[Atom] = None, interpretations: Sequence[Interpretation] = None):
+        self._examples: Sequence[Interpretation] = interpretations
+        self._positive_examples: Set[Atom] = positive_examples
+        self._negative_examples: Set[Atom] = negative_examples
 
-    def get_examples(self) -> Sequence[Union[Atom, Interpretation]]:
-        return self._examples
-
-    def examples_as_atoms(self) -> Sequence[Atom]:
-        if isinstance(self._examples[0], Atom):
+    def get_examples(self) -> Union[Sequence[Interpretation], Tuple[Set[Atom], Set[Atom]]]:
+        if self._examples is not None:
             return self._examples
         else:
-            raise Exception(f"Cannot return examples as atoms because examples as provided as interpretations")
-
-    def examples_as_interpretations(self) -> Sequence[Interpretation]:
-        if isinstance(self._examples[0], Interpretation):
-            return self._examples
-        else:
-            raise Exception(f"Cannot return examples as interpretations because examples as provided as atoms")
+            return self._positive_examples, self._negative_examples

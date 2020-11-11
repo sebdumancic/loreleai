@@ -180,6 +180,11 @@ Then it returns all valid recursions.
 
 
 
+# Using the hypothesis space
+
+The file `simple_learning_system.py` illustrates how to build a simple enumerative learner.
+
+
 
 
 

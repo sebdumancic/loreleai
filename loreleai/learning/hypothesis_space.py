@@ -292,7 +292,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
         else:
             self._pointers[name] = self._root_node if init_value is None else init_value
 
-    def reset_pointer(self, name: str, init_value: Body = None):
+    def reset_pointer(self, name: str = "main", init_value: Body = None):
         """
         Resets the specified pointer to the root or the specified initial value
         """
@@ -356,6 +356,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
         Expands the provided node with provided primitives (extensions become its children in a graph)
 
         returns the expanded constructs
+        if already expanded, returns an empty list
         """
         body = node.get_body()
 
@@ -371,6 +372,8 @@ class TopDownHypothesisSpace(HypothesisSpace):
 
         if len(expansions) == 0:
             expansions = self._expand_body(body)
+        else:
+            return []
 
         return reduce(
             lambda x, y: x + y,
