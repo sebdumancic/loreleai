@@ -691,6 +691,7 @@ class Clause:
         self._repr_cache = None
         self.term_signatures = None
         self.inverted_term_signatures = None
+        self._hash_cache = None
 
         for lit in self._body.get_literals():
             self._terms = self._terms.union(lit.get_terms())
