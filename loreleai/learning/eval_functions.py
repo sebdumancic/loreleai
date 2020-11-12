@@ -76,7 +76,7 @@ class Entropy(EvalFunction):
     negative and positive examples into two distinct categories.
     This implementation uses:
 
-    p * log10(p) + (1-p) * log10(1-p), with p = P/(P+N). 
+    -(p * log10(p) + (1-p) * log10(1-p)), with p = P/(P+N). 
     P and N are respectively
     the number of positive and negative examples that are covered by the clause
     """
@@ -91,5 +91,9 @@ class Entropy(EvalFunction):
             return 0
 
         p = covered_pos/(covered_pos+covered_neg)
-        return p*math.log10(p) + (1-p)*math.log10(1-p)    
+
+        # Perfect split, no entropy
+        if p == 1 or p == 0:
+            return 0
+        return -(p*math.log10(p) + (1-p)*math.log10(1-p))    
     

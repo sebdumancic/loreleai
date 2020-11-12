@@ -6,6 +6,7 @@ from loreleai.learning.task import Knowledge, Task
 from loreleai.language.commons import Clause,Atom,Procedure
 from loreleai.learning.hypothesis_space import TopDownHypothesisSpace
 from loreleai.learning.eval_functions import EvalFunction
+import datetime
 
 
 
@@ -162,6 +163,8 @@ class TemplateLearner(ABC):
         examples_to_use = examples
         pos, _ = examples_to_use.get_examples()
         i = 0
+        start = datetime.datetime.now()
+
 
         while len(final_program) == 0 or len(pos) > 0:
             # learn na single clause
@@ -183,5 +186,8 @@ class TemplateLearner(ABC):
 
             examples_to_use = Task(pos, neg)
             i += 1
+
+        if self._print:
+            print("Done! Search took {:.5f} seconds.".format((datetime.datetime.now()-start).total_seconds()))
 
         return final_program
