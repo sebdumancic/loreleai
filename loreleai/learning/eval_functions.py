@@ -7,8 +7,12 @@ import math
 
 
 class EvalFunction(ABC):
-    def __init__(self):
-        pass
+    """
+    Abstract base class for an evaluation function
+    """
+
+    def __init__(self,name):
+        self._name = name
 
     @abstractmethod
     def evaluate(self, clause: Clause, examples: Task,covered: Sequence[Atom]):
@@ -18,11 +22,17 @@ class EvalFunction(ABC):
         """
         raise NotImplementedError()
 
+    def name(self):
+        return self._name
+
 class Accuracy(EvalFunction):
     """
     Accuracy is defined as the number of positive examples coverd,
     divided by the number of positive and negative examples covered
     """
+    def __init__(self):
+        super().__init__("Accuracy")
+
     def evaluate(self, clause: Clause, examples: Task, covered: Sequence[Atom]):
         pos,neg = examples.get_examples()
         covered_pos = len(pos.intersection(covered))
@@ -36,6 +46,9 @@ class Compression(EvalFunction):
     """
     Compression is similar to coverage but favours shorter clauses
     """
+    def __init__(self):
+        super().__init__("Compression")
+
     def evaluate(self, clause: Clause, examples: Task, covered: Sequence[Atom]):
         pos,neg = examples.get_examples()
         covered_pos = len(pos.intersection(covered))
@@ -48,6 +61,9 @@ class Coverage(EvalFunction):
     Coverage is defined as the difference between the number of positive
     and negative examples covered
     """
+    def __init__(self):
+        super().__init__("Coverage")
+
     def evaluate(self, clause: Clause, examples: Task, covered: Sequence[Atom]):
         pos,neg = examples.get_examples()
         covered_pos = len(pos.intersection(covered))
@@ -64,6 +80,9 @@ class Entropy(EvalFunction):
     P and N are respectively
     the number of positive and negative examples that are covered by the clause
     """
+    def __init__(self):
+        super().__init__("Entropy")
+
     def evaluate(self, clause: Clause, examples: Task, covered: Sequence[Atom]):
         pos,neg = examples.get_examples()
         covered_pos = len(pos.intersection(covered))

@@ -27,8 +27,8 @@ The learner does not handle recursions correctly!
 """
 class SimpleBreadthFirstLearner(TemplateLearner):
 
-    def __init__(self, solver_instance: LPSolver, eval_fn: EvalFunction, max_body_literals=4):
-        super().__init__(solver_instance,eval_fn)
+    def __init__(self, solver_instance: LPSolver, eval_fn: EvalFunction, max_body_literals=4,do_print=False):
+        super().__init__(solver_instance,eval_fn,do_print=do_print)
         self._max_body_literals = max_body_literals
 
     def initialise_pool(self):

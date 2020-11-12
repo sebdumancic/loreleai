@@ -29,10 +29,11 @@ The learner does not handle recursions correctly!
 """
 class TemplateLearner(ABC):
 
-    def __init__(self, solver_instance: LPSolver, eval_fn: EvalFunction):
+    def __init__(self, solver_instance: LPSolver, eval_fn: EvalFunction, do_print=False):
         self._solver = solver_instance
         self._candidate_pool = []
         self._eval_fn = eval_fn
+        self._print = do_print
 
     def _assert_knowledge(self, knowledge: Knowledge):
         """
@@ -140,12 +141,16 @@ class TemplateLearner(ABC):
             #     it is safer than to use the .get_successors_of method
             exps = hypothesis_space.get_successors_of(current_cand)
             exps = self.process_expansions(examples, exps, hypothesis_space)
-            # add into pull
+            # add into pool
             self.put_into_pool(exps)
 
             score = self.evaluate(examples, current_cand)
 
+        if self._print:
+            print(f"- New clause: {current_cand}")
+            print(f"- Candidates has value {round(score,2)} for metric '{self._eval_fn.name()}'")
         return current_cand
+        
 
     def learn(self, examples: Task, knowledge: Knowledge, hypothesis_space: TopDownHypothesisSpace):
         """
@@ -156,9 +161,17 @@ class TemplateLearner(ABC):
         final_program = []
         examples_to_use = examples
         pos, _ = examples_to_use.get_examples()
+        i = 0
 
         while len(final_program) == 0 or len(pos) > 0:
             # learn na single clause
+
+            if self._print:
+                print(f"Iteration {i}")
+                print("- Current program:")
+                for program_clause in final_program:
+                    print("\t"+str(program_clause))
+                
             cl = self._learn_one_clause(examples_to_use, hypothesis_space)
             final_program.append(cl)
 
@@ -169,5 +182,6 @@ class TemplateLearner(ABC):
             pos = pos.difference(covered)
 
             examples_to_use = Task(pos, neg)
+            i += 1
 
         return final_program
