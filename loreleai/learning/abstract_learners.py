@@ -5,6 +5,7 @@ from loreleai.reasoning.lp import LPSolver
 from loreleai.learning.task import Knowledge, Task
 from loreleai.language.commons import Clause,Atom,Procedure
 from loreleai.learning.hypothesis_space import TopDownHypothesisSpace
+from loreleai.learning.eval_functions import EvalFunction
 
 
 
@@ -28,9 +29,10 @@ The learner does not handle recursions correctly!
 """
 class TemplateLearner(ABC):
 
-    def __init__(self, solver_instance: LPSolver):
+    def __init__(self, solver_instance: LPSolver, eval_fn: EvalFunction):
         self._solver = solver_instance
         self._candidate_pool = []
+        self._eval_fn = eval_fn
 
     def _assert_knowledge(self, knowledge: Knowledge):
         """
@@ -85,14 +87,13 @@ class TemplateLearner(ABC):
         """
         raise NotImplementedError()
 
-    @abstractmethod
     def evaluate(self, examples: Task, clause: Clause) -> typing.Union[int, float]:
         """
-        Evaluates a clause  of a task
-
+        Evaluates a clause evaluating the Learner's eval_fn
         Returns a number (the higher the better)
         """
-        raise NotImplementedError()
+        covered = self._execute_program(clause)
+        return self._eval_fn.evaluate(clause,examples,covered)
 
     @abstractmethod
     def stop_inner_search(self, eval: typing.Union[int, float], examples: Task, clause: Clause) -> bool:

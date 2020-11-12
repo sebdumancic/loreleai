@@ -5,4 +5,3 @@ from .language_manipulation import plain_extension
 from .task import Knowledge, Interpretation, Task
 from .utilities import FillerPredicate, are_variables_connected
 from .abstract_learners import TemplateLearner
-# from .eval_function import 

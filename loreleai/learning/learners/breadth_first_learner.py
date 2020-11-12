@@ -6,7 +6,7 @@ from loreleai.reasoning.lp import LPSolver
 from loreleai.language.commons import Clause,Atom,Procedure
 from loreleai.learning.task import Task, Knowledge
 from loreleai.learning.hypothesis_space import TopDownHypothesisSpace
-
+from loreleai.learning.eval_functions import EvalFunction
 
 from orderedset import OrderedSet
 
@@ -27,8 +27,8 @@ The learner does not handle recursions correctly!
 """
 class SimpleBreadthFirstLearner(TemplateLearner):
 
-    def __init__(self, solver_instance: LPSolver, max_body_literals=4):
-        super().__init__(solver_instance)
+    def __init__(self, solver_instance: LPSolver, eval_fn: EvalFunction, max_body_literals=4):
+        super().__init__(solver_instance,eval_fn)
         self._max_body_literals = max_body_literals
 
     def initialise_pool(self):
@@ -43,18 +43,6 @@ class SimpleBreadthFirstLearner(TemplateLearner):
     def get_from_pool(self) -> Clause:
         return self._candidate_pool.pop(0)
 
-    def evaluate(self, examples: Task, clause: Clause) -> typing.Union[int, float]:
-        covered = self._execute_program(clause)
-
-        pos, neg = examples.get_examples()
-
-        covered_pos = pos.intersection(covered)
-        covered_neg = neg.intersection(covered)
-
-        if len(covered_neg) > 0:
-            return 0
-        else:
-            return len(covered_pos)
 
     def stop_inner_search(self, eval: typing.Union[int, float], examples: Task, clause: Clause) -> bool:
         if eval > 0:
