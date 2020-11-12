@@ -7,5 +7,5 @@ __all__ = [
     'DatalogSolver',
     'LPSolver',
     'RelationalSolver',
-    'Prolog'
+    # 'Prolog'
 ]
