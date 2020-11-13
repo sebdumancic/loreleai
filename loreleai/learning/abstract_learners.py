@@ -4,11 +4,20 @@ from abc import ABC, abstractmethod
 from loreleai.reasoning.lp import LPSolver
 from loreleai.learning.task import Knowledge, Task
 from loreleai.language.commons import Clause,Atom,Procedure
-from loreleai.learning.hypothesis_space import TopDownHypothesisSpace
+from loreleai.learning.hypothesis_space import TopDownHypothesisSpace, HypothesisSpace
 from loreleai.learning.eval_functions import EvalFunction
 import datetime
 
+class Learner(ABC):
+    """
+    Base class for all learners
+    """
+    def __init__(self):
+        raise NotImplementedError()
 
+    @abstractmethod
+    def learn(self, examples: Task, knowledge: Knowledge, hypothesis_space: HypothesisSpace):
+        raise NotImplementedError()
 
 """
 This is an abstract learner class that defines a learner with the configurable options.
@@ -28,7 +37,8 @@ It is implemented as a template learner - you still need to provide the followin
                                                     
 The learner does not handle recursions correctly!
 """
-class TemplateLearner(ABC):
+
+class TemplateLearner(Learner):
 
     def __init__(self, solver_instance: LPSolver, eval_fn: EvalFunction, do_print=False):
         self._solver = solver_instance
