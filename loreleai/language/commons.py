@@ -170,6 +170,12 @@ class Constant(Term):
             self.hash_cache = hash(self.__repr__())
         return self.hash_cache  # hash(self.__repr__())
 
+    def __eq__(self,other):
+        if not isinstance(self,type(other)):
+            return False
+        else:
+            return self.name == other.name 
+
 
 @dataclass
 class Variable(Term):
