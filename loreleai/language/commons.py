@@ -713,7 +713,6 @@ class Clause:
             Return:
                 new clause with the replaced literals
         """
-        print(self._body.substitute(term_map))
         return Clause(self._head.substitute(term_map), self._body.substitute(term_map),)
 
     def substitute_head_predicate(self, new_pred: Predicate):
