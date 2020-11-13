@@ -707,6 +707,7 @@ class Clause:
             Return:
                 new clause with the replaced literals
         """
+        print(self._body.substitute(term_map))
         return Clause(self._head.substitute(term_map), self._body.substitute(term_map),)
 
     def substitute_head_predicate(self, new_pred: Predicate):
@@ -830,6 +831,15 @@ class Clause:
             [new_atom.substitute(substitutes)]
             + [x for x in self._body.get_literals() if x not in atoms_to_replace],
         )
+
+    def negate(self):
+        """
+        Inverting a clause A <= B,C
+        is equal to the set {not A, B, C}
+        """
+        new_head = Not(self._head)
+        new_body = [lit for lit in self._body.get_literals()]
+        return [new_head]+new_body
 
     def is_recursive(self) -> bool:
         """
