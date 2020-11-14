@@ -1,36 +1,37 @@
 from loreleai.learning.learners import Aleph
+from loreleai.learning.task import Task,Knowledge
 from loreleai.language.commons import c_type,Clause, Term, Variable, Constant, c_pred,c_const,c_var
+from loreleai.learning import HypothesisSpace
+from loreleai.reasoning.lp.prolog import SWIProlog
+from loreleai.learning.eval_functions import Coverage
 
 if __name__ == "__main__":
     
-    learner = Aleph()
 
-    x = c_var("X")
-    y = c_var("Y")
-    z = c_var("Z")
+    # define the predicates
+    father = c_pred("father", 2)
+    mother = c_pred("mother", 2)
+    grandparent = c_pred("grandparent", 2)
 
-    # ancestor = c_pred("ancestor",2)
-    # parent = c_pred("parent",2)
+    # specify the background knowledge
+    background = Knowledge(father("a", "b"), mother("a", "b"), mother("b", "c"),
+                           father("e", "f"), father("f", "g"),
+                           mother("h", "i"), mother("i", "j"))
 
-    # rose = c_const("rose")
-    # luc = c_const("luc")
-    # leo = c_const("leo")
+    # positive examples
+    pos = {grandparent("a", "c"), grandparent("e", "g"), grandparent("h", "j")}
 
-    polygon = c_pred("polygon",1)
-    rectangle = c_pred("rectangle",1)
-    square = c_pred("square",1)
-    pos = c_pred("pos",1)
-    red = c_pred("red",1)
+    # negative examples
+    neg = {grandparent("a", "b"), grandparent("a", "g"), grandparent("i", "j")}
 
-    theory = [
-        Clause(polygon(x),[rectangle(x)]),
-        Clause(rectangle(x),[square(x)]),
-    ]
-    c = Clause(pos(x),[red(x),square(x)])
+    task = Task(positive_examples=pos, negative_examples=neg)
 
     # print(type(Clause(parent(leo,rose),[]).get_head().get_arguments()[0]))
 
-    print(learner._compute_bottom_clause(theory,c))
+    solver = SWIProlog()
+    learner = Aleph(solver,Coverage(),max_body_literals=5,do_print=True)
+    pr = learner.learn(task,background,None)
+    print("Final program: {}".format(str(pr)))
 
 
 

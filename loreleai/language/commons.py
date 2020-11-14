@@ -842,7 +842,7 @@ class Clause:
         Inverting a clause A <= B,C
         is equal to the set {not A, B, C}
         """
-        new_head = Not(self._head)
+        new_head = Not(self._head) if self._head is not None else None
         new_body = [lit for lit in self._body.get_literals()]
         return [new_head]+new_body
 
