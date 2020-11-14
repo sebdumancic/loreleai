@@ -1,10 +1,10 @@
 import typing
 from abc import ABC, abstractmethod
 from loreleai.learning.abstract_learners import Learner
-from typing import Sequence
+from typing import Sequence, Dict
 
 from loreleai.learning import Task, Knowledge, HypothesisSpace
-from loreleai.language.commons import Clause, Constant,c_type,Variable
+from loreleai.language.commons import Clause, Constant,c_type,Variable,Not
 from itertools import product, combinations_with_replacement
 from collections import Counter
 
@@ -24,6 +24,22 @@ class Aleph(Learner):
         """
         print("Finished learning")
 
+    def _compute_bottom_clause(self,theory: Sequence[Clause],c: Clause) -> Clause:
+        """
+        Algorithm from (De Raedt,2008)
+        """
+        
+        #1. Find a skolemization substitution θ for c (w.r.t. B and c)
+        _, theta = self._skolemize(c)
+        
+        #2. Compute the least Herbrand model M of theory ¬body(c)θ
+        body_facts = [Clause(l.substitute(theta),[]) for l in c.get_body().get_literals()]
+        m = self._herbrand_model(theory+body_facts)
+        
+        #3. Deskolemize the clause head(cθ) <= M and return the result.
+        theta_inv = {value:key for key,value in theta.items()}
+        return Clause(c.get_head(),[l.get_head().substitute(theta_inv) for l in m])
+
     def _skolemize(self,clause: Clause) -> Clause:
         # Find all variables in clause
         vars = clause.get_variables()
@@ -40,7 +56,7 @@ class Aleph(Learner):
         # Return both new clause and mapping
         return Clause(h,b),subst
 
-    def _herbrand_model(self,clauses: Sequence[Clause]):
+    def _herbrand_model(self,clauses: Sequence[Clause]) -> Sequence[Clause]:
         """
         Computes a minimal Herbrand model of a theory 'clauses'.
         Algorithm from (De Raedt, 2008)
@@ -101,13 +117,13 @@ class Aleph(Learner):
         return m[i]
 
     
-def _flatten(l):
+def _flatten(l) -> Sequence:
     """
     [[1],[2],[3]] -> [1,2,3]
     """
     return [item for sublist in l for item in sublist]
 
-def _all_maps(l1,l2):
+def _all_maps(l1,l2) -> Sequence[Dict[Variable,Constant]]:
     """
     Return all maps between l1 and l2
     such that all elements of l1 have an entry in the map
