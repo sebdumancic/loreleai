@@ -22,15 +22,19 @@ if __name__ == "__main__":
     pos = {grandparent("a", "c"), grandparent("e", "g"), grandparent("h", "j")}
 
     # negative examples
-    neg = {grandparent("a", "b"), grandparent("a", "g"), grandparent("i", "j")}
+    neg = {grandparent("a", "b"), grandparent("a", "g"), grandparent("i", "j"),grandparent("f","g")}
 
     task = Task(positive_examples=pos, negative_examples=neg)
 
     # print(type(Clause(parent(leo,rose),[]).get_head().get_arguments()[0]))
 
     solver = SWIProlog()
-    learner = Aleph(solver,Coverage(),max_body_literals=5,do_print=True)
+
+    learner = Aleph(solver,Coverage(),max_body_literals=4,do_print=True)
+
     pr = learner.learn(task,background,None)
+    # x = c_var("X")
+    # print(learner.evaluate(task,Clause(grandparent(x,x),[])))
     print("Final program: {}".format(str(pr)))
 
 

@@ -1,6 +1,6 @@
 import typing
 from abc import ABC, abstractmethod
-from typing import Sequence, Dict
+from typing import Sequence, Dict, Tuple
 from orderedset import OrderedSet
 
 from loreleai.learning.abstract_learners import Learner,TemplateLearner
@@ -39,16 +39,19 @@ class Aleph(TemplateLearner):
         prog = []
 
         i=1
+        stop = False
 
-        while len(pos) > 0:
+        while len(pos) > 0 and not stop:
             # Pick example from pos
             pos_ex = Clause(list(pos)[0],[])
             bk = knowledge.as_clauses()
             print("Next iteration: generalizing example {}".format(str(pos_ex)))
             bottom = self._compute_bottom_clause(bk,pos_ex)
+            print("Bottom clause: "+str(bottom))
             
             # Predicates can only be picked from the body of the bottom clause
             body_predicates = list(set(map(lambda l: l.get_predicate(),bottom.get_body().get_literals())))
+            print(body_predicates)
             hs = TopDownHypothesisSpace(primitives=[
                                             lambda x: plain_extension(x, pred, connected_clauses=True) for pred in body_predicates],
                                         head_constructor=pos_ex.get_head().get_predicate(),
@@ -56,32 +59,41 @@ class Aleph(TemplateLearner):
                                                                 lambda x, y: has_duplicated_literal(x, y)])
             
             cl = self._learn_one_clause(examples_to_use,hs)
-            print("- New clause: "+str(cl))
             prog.append(cl)
-            print(prog)
 
             # update covered positive examples
             covered = self._execute_program(cl)
+            print("- New clause: "+str(cl))
+            print("Clause covers {} pos examples: {}".format(len(pos.intersection(covered)),pos.intersection(covered)))
+
 
             pos, neg = examples_to_use.get_examples()
             pos = pos.difference(covered)
+
 
             examples_to_use = Task(pos, neg)
 
             print("Finished iteration {}".format(i))
             print("Current program: {}".format(str(prog)))
             i+=1
+            stop = False
 
         return prog
 
     def initialise_pool(self):
         self._candidate_pool = OrderedSet()
 
-    def put_into_pool(self, candidates: typing.Union[Clause, Procedure, typing.Sequence]) -> None:
-        if isinstance(candidates, Clause):
+    def put_into_pool(self, candidates: Tuple[typing.Union[Clause, Procedure, typing.Sequence],float]) -> None:
+        if isinstance(candidates, Tuple):
             self._candidate_pool.add(candidates)
         else:
             self._candidate_pool |= candidates
+
+    def prune_pool(self,minValue):
+        """
+        Removes all clauss with value < minValue form pool
+        """
+        self._candidate_pool = OrderedSet([t for t in self._candidate_pool if not t[1] <= minValue])
 
     def get_from_pool(self) -> Clause:
         return self._candidate_pool.pop(0)
@@ -117,7 +129,8 @@ class Aleph(TemplateLearner):
         Returns a set of atoms that the clause covers
         """
         if len(clause.get_body().get_literals()) == 0:
-            return []
+            # Covers all possible examples because trivial hypothesis
+            return None
         else:
             head_predicate = clause.get_head().get_predicate()
             head_variables = clause.get_head_variables()
@@ -130,42 +143,66 @@ class Aleph(TemplateLearner):
 
     def _learn_one_clause(self, examples: Task, hypothesis_space: TopDownHypothesisSpace) -> Clause:
         """
-        Learns a single clause
-
-        Returns a clause
+        Learns a single clause to add to the theory
+        Algorithm from https://www.cs.ox.ac.uk/activities/programinduction/Aleph/aleph.html#SEC45
         """
         # reset the search space
         hypothesis_space.reset_pointer()
 
         # empty the pool just in case
         self.initialise_pool()
+        
+        # Add first clauses into pool (active)
+        initial_clauses = hypothesis_space.get_current_candidate()
+        self.put_into_pool([(cl,self.evaluate(examples,cl)) for cl in initial_clauses])
+        # print(self._candidate_pool)
+        currentbest = None
+        currentbestvalue = -99999
 
-        # put initial candidates into the pool
-        self.put_into_pool(hypothesis_space.get_current_candidate())
-        current_cand = None
-        score = -100
+        i=0
 
-        while current_cand is None or (len(self._candidate_pool) > 0 and not self.stop_inner_search(score, examples, current_cand)):
-            # get first candidate from the pool
-            current_cand = self.get_from_pool()
+        # Upper bound for coverage for a clause: no pos ex 
 
-            # expand the candidate
-            _ = hypothesis_space.expand(current_cand)
-            # this is important: .expand() method returns candidates only the first time it is called;
-            #     if the same node is expanded the second time, it returns the empty list
-            #     it is safer than to use the .get_successors_of method
-            exps = hypothesis_space.get_successors_of(current_cand)
+        while len(self._candidate_pool) > 0:
+            # Optimise: pick smart according to evalFn (e.g. shorter clause when using compression)
+            k = self.get_from_pool()
+            # print("Expanding clause {}".format(k[0]))
+            hypothesis_space.move_pointer_to(k[0])
+            # Generate children of k
+            new_clauses = hypothesis_space.expand(k[0])
 
-            exps = self.process_expansions(examples, exps, hypothesis_space)
-            # add into pool
-            self.put_into_pool(exps)
+            # Remove clauses that are too long...
+            new_clauses = self.process_expansions(examples,new_clauses,hypothesis_space)
+            # Compute costs for these children
+            value = {cl:self.evaluate(examples,cl) for cl in new_clauses}
+            # print("new_clauses: {}, {}".format(len(new_clauses),[(cl,value[cl]) for cl in new_clauses]))
+            # upper bound(?), take some big value for now TODO
+            # TODO: Li stays high so no pruning at all...
+            Li = 999999999
 
-            score = self.evaluate(examples, current_cand)
+            for c in new_clauses:
+                # If upper bound too low, don't bother
+                if Li <= currentbestvalue:
+                    hypothesis_space.remove(c)
+                else:
+                    if value[c] > currentbestvalue:
+                        currentbestvalue = value[c]
+                        currentbest = c
+                        # self.prune_pool(value[c])
+                        # print("Found new best: {}: {} {}".format(c,self._eval_fn.name(),value[c]))
+                        # print("Pruning to minimum {} {}".format(self._eval_fn.name(),value[c]))
 
-        if self._print:
-            print(f"- New clause: {current_cand}")
-            print(f"- Candidates has value {round(score,2)} for metric '{self._eval_fn.name()}'")
-        return current_cand
+
+                    self.put_into_pool((c,value[c]))
+                    # print("Put {} into pool, contains {} clauses".format(str(c),len(self._candidate_pool)))
+
+            i += 1
+
+        # print("New clause: {} with score {}".format(currentbest,currentbestvalue))
+        return currentbest
+    
+
+
 
 
     def _compute_bottom_clause(self,theory: Sequence[Clause],c: Clause) -> Clause:
