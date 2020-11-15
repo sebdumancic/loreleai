@@ -105,6 +105,11 @@ class TemplateLearner(Learner):
         Returns a number (the higher the better)
         """
         covered = self._execute_program(clause)
+        # if 'None', i.e. trivial hypothesis, all clauses are covered
+        if covered is None:
+            pos,neg = examples.get_examples()
+            covered = pos.union(neg)
+
         return self._eval_fn.evaluate(clause,examples,covered)
 
     @abstractmethod
