@@ -5,7 +5,7 @@ from orderedset import OrderedSet
 
 from loreleai.learning.abstract_learners import Learner,TemplateLearner
 from loreleai.learning import Task, Knowledge, HypothesisSpace, TopDownHypothesisSpace
-from loreleai.language.commons import Clause, Constant,c_type,Variable,Not,Atom, Procedure
+from loreleai.language.commons import Clause, Constant,c_type,Variable,Not,Atom, Procedure,c_pred
 from itertools import product, combinations_with_replacement
 from collections import Counter
 from loreleai.reasoning.lp import LPSolver
@@ -15,6 +15,15 @@ from loreleai.learning.eval_functions import EvalFunction, Coverage
  
 
 class Aleph(TemplateLearner):
+    """
+    Implements the Aleph learner in loreleai. See https://www.cs.ox.ac.uk/activities/programinduction/Aleph/aleph.html#SEC45.
+    Aleph efficiently searches the hypothesis space by bounding the search from above (X :- true) and below (using the bottom clause),
+    and by using mode declarations for predicates. It iteratively adds new clauses that maximize the evalfn. Searching for a new clause
+    is done using a branch-and-bound algorithm, where clauses that are guaranteed to not lead to improvements are immediately pruned.
+
+    Aleph currently only supports eval functions that can define an upper bound on the quality of a clause, such as Coverage
+    and Compression.
+    """
     def __init__(self,solver: LPSolver, eval_fn: EvalFunction,max_body_literals=5,do_print=False):
         super().__init__(solver,eval_fn,do_print)
         self._max_body_literals = max_body_literals
@@ -24,9 +33,10 @@ class Aleph(TemplateLearner):
         """
         To find a hypothesis, Aleph uses the following set covering approach:
         1.  Select a positive example to be generalised. If none exists, stop; otherwise proceed to the next step.
-        2.  Construct the most specific clause (the bottom clause) (Muggleton, 1995) that entails theselected example and that is consistent with the mode declarations.
+        2.  Construct the most specific clause (the bottom clause) (Muggleton, 1995) that entails the selected example
+            and that is consistent with the mode declarations.
         3.  Search for a clause more general than the bottom clause and that has the best score.
-        4.  Add the clause to the current hypothesis and remove all the examples made redundantby it.
+        4.  Add the clause to the current hypothesis and remove all the examples made redundant by it.
         Return to step 1.
         (Description from Cropper and Dumancic )
         """
@@ -41,42 +51,46 @@ class Aleph(TemplateLearner):
         i=1
         stop = False
 
-        while len(pos) > 0 and not stop:
+        while len(pos) > 0 and not stop and not i>5:
             # Pick example from pos
             pos_ex = Clause(list(pos)[0],[])
             bk = knowledge.as_clauses()
-            print("Next iteration: generalizing example {}".format(str(pos_ex)))
             bottom = self._compute_bottom_clause(bk,pos_ex)
-            print("Bottom clause: "+str(bottom))
+            if self._print:
+                print("Next iteration: generalizing example {}".format(str(pos_ex)))
+                print("Bottom clause: "+str(bottom))
             
             # Predicates can only be picked from the body of the bottom clause
             body_predicates = list(set(map(lambda l: l.get_predicate(),bottom.get_body().get_literals())))
-            print(body_predicates)
-            hs = TopDownHypothesisSpace(primitives=[
-                                            lambda x: plain_extension(x, pred, connected_clauses=True) for pred in body_predicates],
+
+            # IMPORTANT: use VALUE of pred, not the variable pred
+            # Has something to do with closures...
+            extensions = [lambda x,y=pred: plain_extension(x,y,connected_clauses=True) for pred in body_predicates]
+
+
+            hs = TopDownHypothesisSpace(primitives=extensions,
                                         head_constructor=pos_ex.get_head().get_predicate(),
                                         expansion_hooks_reject=[lambda x, y: has_singleton_vars(x, y),
                                                                 lambda x, y: has_duplicated_literal(x, y)])
-            
+
             cl = self._learn_one_clause(examples_to_use,hs)
             prog.append(cl)
 
             # update covered positive examples
             covered = self._execute_program(cl)
-            print("- New clause: "+str(cl))
-            print("Clause covers {} pos examples: {}".format(len(pos.intersection(covered)),pos.intersection(covered)))
-
+            if self._print:
+                print("- New clause: "+str(cl))
+                print("Clause covers {} pos examples: {}".format(len(pos.intersection(covered)),pos.intersection(covered)))
 
             pos, neg = examples_to_use.get_examples()
             pos = pos.difference(covered)
 
-
             examples_to_use = Task(pos, neg)
 
-            print("Finished iteration {}".format(i))
-            print("Current program: {}".format(str(prog)))
+            if self._print:
+                print("Finished iteration {}".format(i))
+                print("Current program: {}".format(str(prog)))
             i+=1
-            stop = False
 
         return prog
 
@@ -91,18 +105,15 @@ class Aleph(TemplateLearner):
 
     def prune_pool(self,minValue):
         """
-        Removes all clauss with value < minValue form pool
+        Removes all clauss with upper bound on value < minValue form pool
         """
-        self._candidate_pool = OrderedSet([t for t in self._candidate_pool if not t[1] <= minValue])
+        self._candidate_pool = OrderedSet([t for t in self._candidate_pool if not t[2] < minValue])
 
     def get_from_pool(self) -> Clause:
         return self._candidate_pool.pop(0)
 
     def stop_inner_search(self, eval: typing.Union[int, float], examples: Task, clause: Clause) -> bool:
-        if eval > 0:
-            return True
-        else:
-            return False
+        raise NotImplementedError()
 
     def process_expansions(self, examples: Task, exps: typing.Sequence[Clause], hypothesis_space: TopDownHypothesisSpace) -> typing.Sequence[Clause]:
         # eliminate every clause with more body literals than allowed
@@ -143,7 +154,7 @@ class Aleph(TemplateLearner):
 
     def _learn_one_clause(self, examples: Task, hypothesis_space: TopDownHypothesisSpace) -> Clause:
         """
-        Learns a single clause to add to the theory
+        Learns a single clause to add to the theory.
         Algorithm from https://www.cs.ox.ac.uk/activities/programinduction/Aleph/aleph.html#SEC45
         """
         # reset the search space
@@ -154,7 +165,7 @@ class Aleph(TemplateLearner):
         
         # Add first clauses into pool (active)
         initial_clauses = hypothesis_space.get_current_candidate()
-        self.put_into_pool([(cl,self.evaluate(examples,cl)) for cl in initial_clauses])
+        self.put_into_pool([(cl,self.evaluate(examples,cl)[0],self.evaluate(examples,cl)[1]) for cl in initial_clauses])
         # print(self._candidate_pool)
         currentbest = None
         currentbestvalue = -99999
@@ -174,35 +185,35 @@ class Aleph(TemplateLearner):
             # Remove clauses that are too long...
             new_clauses = self.process_expansions(examples,new_clauses,hypothesis_space)
             # Compute costs for these children
-            value = {cl:self.evaluate(examples,cl) for cl in new_clauses}
+            value = {cl:self.evaluate(examples,cl)[0] for cl in new_clauses}
+            upperbound_value = {cl:self.evaluate(examples,cl)[1] for cl in new_clauses}
             # print("new_clauses: {}, {}".format(len(new_clauses),[(cl,value[cl]) for cl in new_clauses]))
             # upper bound(?), take some big value for now TODO
             # TODO: Li stays high so no pruning at all...
-            Li = 999999999
 
             for c in new_clauses:
-                # If upper bound too low, don't bother
-                if Li <= currentbestvalue:
+                # If upper bound too low, don't bother expanding
+                if upperbound_value[c] <= currentbestvalue:
                     hypothesis_space.remove(c)
                 else:
                     if value[c] > currentbestvalue:
                         currentbestvalue = value[c]
                         currentbest = c
-                        # self.prune_pool(value[c])
+                        len_before = len(self._candidate_pool)
+                        self.prune_pool(value[c])
+                        len_after = len(self._candidate_pool)
+                    
                         # print("Found new best: {}: {} {}".format(c,self._eval_fn.name(),value[c]))
-                        # print("Pruning to minimum {} {}".format(self._eval_fn.name(),value[c]))
+                        # print("Pruning to upperbound {} >= {}: {} of {} clauses removed".format(self._eval_fn.name(),value[c],(len_before-len_after),len_before))
 
 
-                    self.put_into_pool((c,value[c]))
+                    self.put_into_pool((c,value[c],upperbound_value[c]))
                     # print("Put {} into pool, contains {} clauses".format(str(c),len(self._candidate_pool)))
 
             i += 1
 
         # print("New clause: {} with score {}".format(currentbest,currentbestvalue))
         return currentbest
-    
-
-
 
 
     def _compute_bottom_clause(self,theory: Sequence[Clause],c: Clause) -> Clause:

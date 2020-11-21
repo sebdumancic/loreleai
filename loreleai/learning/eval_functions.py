@@ -30,8 +30,9 @@ class Accuracy(EvalFunction):
     Accuracy is defined as the number of positive examples coverd,
     divided by the number of positive and negative examples covered
     """
-    def __init__(self):
+    def __init__(self, return_upperbound=False):
         super().__init__("Accuracy")
+        self._return_upperbound=return_upperbound
 
     def evaluate(self, clause: Clause, examples: Task, covered: Sequence[Atom]):
         pos,neg = examples.get_examples()
@@ -39,35 +40,47 @@ class Accuracy(EvalFunction):
         covered_neg = len(neg.intersection(covered))
 
         if covered_pos + covered_neg == 0:
-            return 0
-        return covered_pos / (covered_pos + covered_neg)
+            return 0 if not self._return_upperbound else 0,0
+        return covered_pos / (covered_pos + covered_neg) if not self._return_upperbound else covered_pos / (covered_pos + covered_neg),1
 
 class Compression(EvalFunction):
     """
     Compression is similar to coverage but favours shorter clauses
     """
-    def __init__(self):
+    def __init__(self,return_upperbound=False):
         super().__init__("Compression")
+        self._return_upperbound = return_upperbound
+
 
     def evaluate(self, clause: Clause, examples: Task, covered: Sequence[Atom]):
         pos,neg = examples.get_examples()
         covered_pos = len(pos.intersection(covered))
         covered_neg = len(neg.intersection(covered))
         clause_length = len(clause.get_literals())
+        if self._return_upperbound:
+            return (covered_pos - covered_neg - clause_length + 1), covered_pos
         return covered_pos - covered_neg - clause_length + 1
 
 class Coverage(EvalFunction):
     """
     Coverage is defined as the difference between the number of positive
-    and negative examples covered
+    and negative examples covered.
     """
-    def __init__(self):
+    def __init__(self,return_upperbound=False):
+        """
+        Initializes the Coverage EvalFunction. When return_upperbound is True,
+        a tuple (coverage, upper_bound) will be returned upon evaluation, where upper_bound 
+        gives the maximum coverage any clauses extending the original clause can achieve
+        """
         super().__init__("Coverage")
+        self._return_upperbound = return_upperbound
 
     def evaluate(self, clause: Clause, examples: Task, covered: Sequence[Atom]):
         pos,neg = examples.get_examples()
         covered_pos = len(pos.intersection(covered))
         covered_neg = len(neg.intersection(covered))
+        if self._return_upperbound:
+            return (covered_pos-covered_neg),covered_pos
         return covered_pos - covered_neg
 
 class Entropy(EvalFunction):
