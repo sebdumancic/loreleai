@@ -120,7 +120,8 @@ class TopDownHypothesisSpace(HypothesisSpace):
         recursive_procedures: bool = False,
         repetitions_in_head_variables: int = 2,
         expansion_hooks_keep: typing.Sequence = (),
-        expansion_hooks_reject: typing.Sequence = ()
+        expansion_hooks_reject: typing.Sequence = (),
+        constants = None
     ):
         super().__init__(
             primitives,
@@ -135,6 +136,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
         self._repetition_vars_head = repetitions_in_head_variables
         self._invented_predicate_count = 0
         self._recursive_pointers_count = 0
+        self._constants = constants
         self._recursive_pointer_prefix = "rec"
         self.initialise()
 
@@ -273,6 +275,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
 
             return True
         else:
+            print("No possible heads")
             return False
 
     def _insert_edge(self, parent: Body, child: Body,) -> None:
@@ -306,9 +309,11 @@ class TopDownHypothesisSpace(HypothesisSpace):
         """
         expansions = OrderedSet()
 
+        # Add the result of applying a primitive
         for item in range(len(self._primitives)):
             exp = self._primitives[item](node)
             expansions = expansions.union(exp)
+
 
         # if recursions should be enumerated when FillerPredicate is used to construct the heads
         if isinstance(self._head_constructor, FillerPredicate) and self._use_recursions:
@@ -316,7 +321,6 @@ class TopDownHypothesisSpace(HypothesisSpace):
             for r_ind in range(len(recursive_cases)):
                 expansions = expansions.union([node + recursive_cases[r_ind]])
 
-        expansions = list(expansions)
 
         # add expansions to the hypothesis space
         # if self._insert_node returns False, forget the expansion
@@ -325,6 +329,8 @@ class TopDownHypothesisSpace(HypothesisSpace):
             r = self._insert_node(expansions[exp_ind])
             if r:
                 expansions_to_consider.append(expansions[exp_ind])
+            else:
+                print("Rejected: {}".format(expansions[exp_ind]))
 
         expansions = expansions_to_consider
 
