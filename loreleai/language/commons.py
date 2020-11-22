@@ -606,7 +606,7 @@ class Body:
         return vars_ordered
 
     def substitute(self, term_map: Dict[Term, Term]):
-        return Body([x.substitute(term_map) for x in self._literals])
+        return Body(*[x.substitute(term_map) for x in self._literals])
 
     def substitute_predicate(self, old_predicate: Predicate, new_predicate: Predicate):
         return Body(
