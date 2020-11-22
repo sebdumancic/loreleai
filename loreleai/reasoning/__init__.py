@@ -1,3 +1,3 @@
-from loreleai.reasoning.lp.lpsolver import LPSolver
+from pylo.engines.lpsolver import LPSolver
 
 __all__ = ['LPSolver']

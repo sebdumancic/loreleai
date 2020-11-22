@@ -3,7 +3,7 @@ from typing import Sequence
 
 import kanren
 
-from ..commons import Clause, Variable
+from loreleai.language.lp import Clause, Variable
 
 
 def _turn_clause_to_interim_repr(clause: Clause, suffix: str = "_x"):

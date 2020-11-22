@@ -1,5 +1,4 @@
-from .kanren_utils import construct_recursive_rule
-from ..commons import (
+from pylo.language.kanren import (
     Term,
     Constant,
     Variable,
@@ -7,7 +6,6 @@ from ..commons import (
     Predicate,
     Type,
     Not,
-    Type,
     Program,
     c_pred,
     c_const,
@@ -15,17 +13,16 @@ from ..commons import (
     c_var,
     c_literal,
     c_fresh_var,
-    Atom,
     Clause,
+    Atom,
     Literal,
     Procedure,
     Disjunction,
     Recursion,
-    Context,
     Body
 )
 
-from ..lp.lp import ClausalTheory
+from .kanren_utils import construct_recursive_rule
 
 __all__ = [
     "Term",
@@ -35,9 +32,7 @@ __all__ = [
     "Predicate",
     "Type",
     "Not",
-    "Type",
     "Program",
-    "ClausalTheory",
     "c_pred",
     "c_const",
     "c_id_to_const",
@@ -51,6 +46,5 @@ __all__ = [
     "Procedure",
     "Disjunction",
     "Recursion",
-    "Context",
     "Body"
 ]

@@ -1,4 +1,4 @@
-from ..commons import (
+from pylo.language.datalog import (
     Term,
     Constant,
     Variable,
@@ -6,7 +6,6 @@ from ..commons import (
     Predicate,
     Type,
     Not,
-    Type,
     Program,
     c_pred,
     c_const,
@@ -21,11 +20,9 @@ from ..commons import (
     Procedure,
     Disjunction,
     Recursion,
-    Context,
     Body
 )
 
-from ..lp import ClausalTheory
 
 __all__ = [
     "Term",
@@ -33,11 +30,9 @@ __all__ = [
     "Variable",
     "Structure",
     "Predicate",
-    "Type",
     "Not",
     "Type",
     "Program",
-    "ClausalTheory",
     "c_pred",
     "c_const",
     "c_id_to_const",
@@ -51,6 +46,5 @@ __all__ = [
     "Procedure",
     "Disjunction",
     "Recursion",
-    "Context",
     "Body"
 ]
