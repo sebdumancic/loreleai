@@ -11,7 +11,8 @@ from loreleai.language.lp import (
     Disjunction,
     Recursion,
     Not,
-    Body
+    Body,
+    Constant
 )
 
 INPUT_ARG = 1
@@ -129,6 +130,51 @@ def _plain_extend_negation_clause(
 
     return candidates
 
+def _instantiate_var_clause(clause: Clause, constant: Constant):
+    """
+    Substitutes a var in clause with constant
+    """
+    if isinstance(clause, Body):
+        suitable_vars = clause.get_variables()
+    else:
+        suitable_vars = clause.get_body_variables()
+
+    candidates = []
+    for var in suitable_vars:
+        candidates.append(clause.substitute({var:constant}))
+    # if len(candidates) > 0:
+    #     print("Type of each is {}", type(candidates[0]))
+    return list(set(candidates))
+
+def variable_instantiation(
+    clause: typing.Union[Clause,Body,Procedure],
+    constant: Constant) -> typing.Sequence[typing.Union[Clause,Body,Procedure]]:
+    """
+    Extends a clause by instantiation replacing all occurrences
+    of a variable with a constant
+    """
+    if isinstance(clause, (Clause, Body)):
+        return _instantiate_var_clause(clause, constant)
+    else:
+        clauses = clause.get_clauses()
+
+        # extend each clause individually
+        extensions = []
+        for cl_ind in range(len(clauses)):
+            clause_extensions = (_instantiate_var_clause(clauses[cl_ind], constant))
+            for ext_cl_ind in range(len(clause_extensions)):
+                cls = [
+                    clauses[x] if x != cl_ind else clause_extensions[ext_cl_ind]
+                    for x in range(len(clauses))
+                ]
+
+                if isinstance(clause, Disjunction):
+                    extensions.append(Disjunction(cls))
+                else:
+                    extensions.append(Recursion(cls))
+        print("Extensions for {} are {}".format(clause,extensions))
+        return extensions
+
 
 def plain_extension(
     clause: typing.Union[Clause, Body, Procedure],
@@ -139,7 +185,6 @@ def plain_extension(
     """
     Extends a clause or a procedure without any bias. Only checks for variable type match.
     Adds the predicate to the clause/procedure
-
     """
     if isinstance(clause, (Clause, Body)):
         if negated:
