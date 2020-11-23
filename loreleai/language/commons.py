@@ -63,7 +63,7 @@ class Type:
 
 class Term:
     """
-        Term base class. A common base class for Predicate, Constant, Variable and Functor symbols.
+    Term base class. A common base class for Predicate, Constant, Variable and Functor symbols.
     """
 
     def __init__(self, name, sym_type: Type = None):
@@ -170,11 +170,11 @@ class Constant(Term):
             self.hash_cache = hash(self.__repr__())
         return self.hash_cache  # hash(self.__repr__())
 
-    def __eq__(self,other):
-        if not isinstance(self,type(other)):
+    def __eq__(self, other):
+        if not isinstance(self, type(other)):
             return False
         else:
-            return self.name == other.name 
+            return self.name == other.name
 
 
 @dataclass
@@ -605,6 +605,22 @@ class Body:
 
         return vars_ordered
 
+    def get_arguments(self) -> Sequence[Term]:
+        """
+        Returns all arguments that occur in literals
+        of this Body. Returns a list of Terms
+        """
+        args_ordered = []
+        args_covered = set()
+        for i in range(len(self._literals)):
+            to_add = [
+                x for x in self._literals[i].get_arguments() if x not in args_covered
+            ]
+            args_ordered += to_add
+            args_covered = args_covered.union(to_add)
+
+        return args_ordered
+
     def substitute(self, term_map: Dict[Term, Term]):
         return Body(*[x.substitute(term_map) for x in self._literals])
 
@@ -704,16 +720,19 @@ class Clause:
 
     def substitute(self, term_map: Dict[Term, Term]):
         """
-            Substitute the terms in the clause
+        Substitute the terms in the clause
 
-            Args:
-                term_map (Dict[Term, Term]): mapping of the terms to their replacements
-                                             (key: term from the clause, value: new term to replace it with)
+        Args:
+            term_map (Dict[Term, Term]): mapping of the terms to their replacements
+                                         (key: term from the clause, value: new term to replace it with)
 
-            Return:
-                new clause with the replaced literals
+        Return:
+            new clause with the replaced literals
         """
-        return Clause(self._head.substitute(term_map), self._body.substitute(term_map),)
+        return Clause(
+            self._head.substitute(term_map),
+            self._body.substitute(term_map),
+        )
 
     def substitute_head_predicate(self, new_pred: Predicate):
         """
@@ -742,13 +761,13 @@ class Clause:
 
     def get_predicates(self) -> Set[Predicate]:
         """
-            Returns the predicates in the clause
+        Returns the predicates in the clause
         """
         return self._body.get_predicates()
 
     def get_variables(self) -> Sequence[Variable]:
         """
-            Returns the of variables in the clause
+        Returns the of variables in the clause
         """
         variables = self.get_head_variables()
         variables += [x for x in self.get_body_variables() if x not in variables]
@@ -756,13 +775,19 @@ class Clause:
 
     def get_head_variables(self) -> Sequence[Variable]:
         """
-            Returns only the head variables
+        Returns only the head variables
         """
         return self._head.get_variables()
 
+    def get_head_arguments(self) -> Sequence[Term]:
+        """
+        Returns all arguments of the head
+        """
+        return self._head.get_arguments()
+
     def get_body_variables(self) -> Sequence[Variable]:
         """
-            Returns variables appearing in the body
+        Returns variables appearing in the body
         """
         vars_ordered = []
         vars_covered = set()
@@ -776,10 +801,10 @@ class Clause:
 
     def get_literals(self, with_predicates: Set[Predicate] = None) -> Sequence[Literal]:
         """
-            Returns the set of atoms in the clause
+        Returns the set of atoms in the clause
 
-            Args:
-                with_predicates (Set[Predicates], optional): return only atoms with these predicates
+        Args:
+            with_predicates (Set[Predicates], optional): return only atoms with these predicates
         """
         if with_predicates is None:
             return self._body.get_literals()
@@ -844,7 +869,7 @@ class Clause:
         """
         new_head = Not(self._head) if self._head is not None else None
         new_body = [lit for lit in self._body.get_literals()]
-        return [new_head]+new_body
+        return [new_head] + new_body
 
     def is_recursive(self) -> bool:
         """
@@ -985,7 +1010,11 @@ class Clause:
 
     def __eq__(self, other):
         if isinstance(other, Clause) and len(self) == len(other):
-            return True if self._head == other.get_head() and self._body == other.get_body() else False
+            return (
+                True
+                if self._head == other.get_head() and self._body == other.get_body()
+                else False
+            )
         else:
             return False
 
@@ -1354,16 +1383,16 @@ def _create_term_signatures(
     literals: Sequence[Union[Atom, Not]]
 ) -> Dict[Term, Dict[Tuple[Predicate], int]]:
     """
-        Creates a term signature for each term in the set of literals
+    Creates a term signature for each term in the set of literals
 
-        A term signature is a list of all appearances of the term in the clause.
-        The appearances are described as a tuple (predicate name, position of the term in the arguments)
+    A term signature is a list of all appearances of the term in the clause.
+    The appearances are described as a tuple (predicate name, position of the term in the arguments)
 
-        Args:
-            literals (List[Atom]): list of literals of the clause
+    Args:
+        literals (List[Atom]): list of literals of the clause
 
-        Returns:
-            returns a dictionary with the tuples as keys and their corresponding number of occurrences in the clause
+    Returns:
+        returns a dictionary with the tuples as keys and their corresponding number of occurrences in the clause
 
     """
     term_signatures = {}
