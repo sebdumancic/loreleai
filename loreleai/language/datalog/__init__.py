@@ -20,7 +20,8 @@ from pylo.language.datalog import (
     Procedure,
     Disjunction,
     Recursion,
-    Body
+    Body,
+    c_type
 )
 
 
@@ -46,5 +47,6 @@ __all__ = [
     "Procedure",
     "Disjunction",
     "Recursion",
-    "Body"
+    "Body",
+    "c_type"
 ]
