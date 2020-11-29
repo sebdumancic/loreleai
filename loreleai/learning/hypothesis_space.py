@@ -275,7 +275,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
 
             return True
         else:
-            print("No possible heads")
+            # print("No possible heads")
             return False
 
     def _insert_edge(self, parent: Body, child: Body,) -> None:
@@ -329,8 +329,8 @@ class TopDownHypothesisSpace(HypothesisSpace):
             r = self._insert_node(expansions[exp_ind])
             if r:
                 expansions_to_consider.append(expansions[exp_ind])
-            else:
-                print("Rejected: {}".format(expansions[exp_ind]))
+            # else:
+            #     print("Rejected: {}".format(expansions[exp_ind]))
 
         expansions = expansions_to_consider
 
