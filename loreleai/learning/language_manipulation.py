@@ -11,7 +11,8 @@ from loreleai.language.lp import (
     Disjunction,
     Recursion,
     Not,
-    Body
+    Body,
+    Atom
 )
 
 INPUT_ARG = 1
@@ -39,6 +40,12 @@ def new_variable(
 
     return c_var(potential_names[0], type)
 
+
+
+"""
+    Plain extensions adds literals to a clause/body with every possible combination of variables
+    (no language bias, all possible combinations)
+"""
 
 def _plain_extend_clause(
     clause: typing.Union[Clause, Body], predicate: Predicate, connected_clause: bool = True
@@ -173,3 +180,80 @@ def plain_extension(
                     extensions.append(Recursion(cls))
 
         return extensions
+
+
+class BottomClauseExpansion:
+
+    def __init__(self, clause: Clause):
+        self._clause: Clause = clause
+        self._variable_literal_dependency: typing.Dict[Variable, typing.List[typing.Union[Atom, Not]]] = {}
+        self._literal_order: typing.Dict[typing.Union[Atom, Not], int] = {}
+
+        self._to_dependency_structure()
+
+    def _to_dependency_structure(self):
+        body_lits = self._clause.get_literals()
+
+        for lit_ind in range(len(body_lits)):
+            # store order of the literal
+            self._literal_order[body_lits[lit_ind]] = len(self._literal_order)
+
+            # compute variable dependency
+            vars = body_lits[lit_ind].get_variables()
+            for v_ind in range(len(vars)):
+                cv = vars[v_ind]
+
+                if cv not in self._variable_literal_dependency:
+                    self._variable_literal_dependency[cv] = []
+
+                self._variable_literal_dependency[cv].append(body_lits[lit_ind])
+
+    def _expand_clause(self, clause: typing.Union[Clause, Body]) -> typing.Sequence[typing.Union[Clause, Body]]:
+        existing_vars = clause.get_variables()
+        used_literals = {x for x in clause.get_literals()}
+        last_literal_id = self._literal_order.get(clause.get_literals()[-1], 0)
+
+        expansions = []
+
+        for v_ind in range(len(existing_vars)):
+            v = existing_vars[v_ind]
+            lits_to_add = [
+                x
+                for x in self._variable_literal_dependency.get(v, [])
+                if x not in used_literals and self._literal_order[x] > last_literal_id
+            ]
+
+            for l_ind in range(len(lits_to_add)):
+                expansions.append(clause + lits_to_add[l_ind])
+
+        return expansions
+
+    def expand(self, clause: typing.Union[Clause, Body, Procedure]) -> typing.Sequence[typing.Union[Body, Clause, Procedure]]:
+        """
+            Expands the clause/byd/procedure by adding literals from the bottom clause
+            :param clause:
+            :param variable_lit_dependency:
+            :return:
+        """
+        if isinstance(clause, (Body, Clause)):
+            return self._expand_clause(clause)
+        else:
+            clauses = clause.get_clauses()
+
+            # extend each clause individually
+            extensions = []
+            for cl_ind in range(len(clauses)):
+                clause_extensions = self._expand_clause(clauses[cl_ind])
+
+                for ext_cl_ind in range(len(clause_extensions)):
+                    cls = [
+                        clauses[x] if x != cl_ind else clause_extensions[ext_cl_ind]
+                        for x in range(len(clauses))
+                    ]
+
+                    if isinstance(clause, Disjunction):
+                        extensions.append(Disjunction(cls))
+                    else:
+                        extensions.append(Recursion(cls))
+
+            return extensions
