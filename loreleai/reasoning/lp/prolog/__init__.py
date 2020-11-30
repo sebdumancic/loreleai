@@ -23,6 +23,8 @@ try:
 except Exception:
     pass
 
+from pylo.engines.prolog import Prolog
+
 engines += ['Prolog']
 __all__ = engines
 
