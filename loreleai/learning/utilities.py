@@ -3,7 +3,7 @@ from typing import Sequence
 
 import networkx as nx
 
-from loreleai.language.commons import Type, c_pred, Body, Atom, Predicate, c_var
+from loreleai.language.lp import Type, c_pred, Body, Atom, Predicate, c_var
 
 
 class FillerPredicate:
