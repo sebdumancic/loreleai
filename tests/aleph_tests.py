@@ -6,38 +6,10 @@ from loreleai.language.commons import c_type,Clause, Term, Variable, Constant, c
 from loreleai.learning import HypothesisSpace
 from loreleai.reasoning.lp.prolog import SWIProlog
 from loreleai.reasoning.lp.datalog import MuZ
-from loreleai.learning.eval_functions import Coverage, Compression
+from loreleai.learning.eval_functions import Coverage, Compression, Accuracy
 from loreleai.learning.language_manipulation import plain_extension, variable_instantiation
 from loreleai.learning.hypothesis_space import TopDownHypothesisSpace
 from loreleai.learning.language_filtering import has_duplicated_literal, has_singleton_vars
-
-def instant():
-    mother = c_pred("mother",2)
-    father = c_pred("father",2)
-    grandparent = c_pred("grandparent",2)
-    tom = c_const("tom")
-    john  = c_const("john")
-    x = c_var("X")
-    y = c_var("Y")
-
-    extensions = [lambda x,y=pred: plain_extension(x,y,connected_clauses=True) for pred in [mother,father]]
-    instantiations = [lambda x,y=const: variable_instantiation(x,y) for const in [tom,john]]
-
-    hs = TopDownHypothesisSpace(primitives=extensions+instantiations,
-                                head_constructor=grandparent,
-                                expansion_hooks_reject=[lambda x, y: has_singleton_vars(x, y),
-                                                        lambda x, y: has_duplicated_literal(x, y)])
-
-    b = Body(mother(x,tom),father(x,john))
-    print("Heads: {}".format(hs._create_possible_heads(b)))
-
-    cands = hs.get_current_candidate()
-    while len(cands) > 0:
-        for i in range(len(cands[:30])):
-            print("{}: {}".format(i,cands[i]))
-        x = int(input("Clause to expand: "))
-        print("Expanding clause {}".format(cands[x]))
-        cands = hs.expand(cands[x])
 
 def learn_with_constants():
     """
@@ -85,22 +57,123 @@ def learn_with_constants():
     solver = SWIProlog()
 
     # EvalFn must return an upper bound on quality to prune search space.
-    eval_fn = Coverage(return_upperbound=True)
-    # eval_fn2 = Compression(return_upperbound=True)
-    # eval_fn3 = Compression(return_upperbound=True)
+    eval_fn1 = Coverage(return_upperbound=True)
+    eval_fn2 = Compression(return_upperbound=True)
+    eval_fn3 = Accuracy(return_upperbound=True)
 
-    learner = Aleph(solver,eval_fn,max_body_literals=5,do_print=False)
-    # learner2 = Aleph(solver,eval_fn2,max_body_literals=4,do_print=True)
-    # learner3 = Aleph(solver,eval_fn3,max_body_literals=4,do_print=True)
+    learners = [Aleph(solver,eval_fn,max_body_literals=4,do_print=False) 
+                    for eval_fn in [eval_fn1,eval_fn3]]
 
-
-    start = datetime.datetime.now()
-    prog = learner.learn(task,bk,None)
-    end = datetime.datetime.now()
-    print("Final program: {}".format(str(prog)))
-    print("Learning took {}s, and {} clauses were considered.".format((end-start).total_seconds(),learner._eval_fn._clauses_evaluated))
+    for learner in learners:
+        start = datetime.datetime.now()
+        prog = learner.learn(task,bk,None,minimum_freq=1)
+        end = datetime.datetime.now()
+        print("Final program: {}".format(str(prog)))
+        print("Learning took {}s, and {} clauses were considered.".format((end-start).total_seconds(),learner._eval_fn._clauses_evaluated))
     
 
+def learn_text():
+    """
+    We describe piece of text spanning multiple lines:
+    "node A red <newline> node B green <newline> node C blue <newline>"
+    using the next\2, linestart\2, lineend\2, tokenlength\2 predicates
+    """
+    token = c_type("token")
+    num = c_type("num")
+
+    next = c_pred("next",2,("token","token"))
+    linestart = c_pred("linestart",2,("token","token"))
+    lineend = c_pred("lineend",2,("token","token"))
+    tokenlength = c_pred("tokenlength",2,("token","num"))
+
+    n1 = c_const("1",num)
+    n3 = c_const("3",num)
+    n4 = c_const("4",num)
+    n5 = c_const("5",num)
+    node1 = c_const("node1",token)
+    node2 = c_const("node2",token)
+    node3 = c_const("node3",token)
+    red = c_const("red",token)
+    green = c_const("green",token)
+    blue = c_const("blue",token)
+    a_c = c_const("a_c",token)
+    b_c = c_const("b_c",token)
+    c_c = c_const("c_c",token)
+    start = c_const("START",token)
+    end = c_const("END",token)
+    
+    bk = Knowledge(
+        next(start,node1),next(node1,a_c),next(a_c,red),
+        next(red,node2),next(node2,green),next(green,b_c),
+        next(b_c,node3),next(node3,c_c),next(c_c,blue),
+        next(blue,end),tokenlength(node1,n4),tokenlength(node2,n4),
+        tokenlength(node3,n4),tokenlength(a_c,n1),tokenlength(b_c,n1),
+        tokenlength(c_c,n1),tokenlength(red,n3),tokenlength(green,n5),
+        tokenlength(blue,n4),linestart(node1,node1),linestart(a_c,node1),
+        linestart(red,node1),linestart(node2,node2),linestart(b_c,node2),
+        linestart(green,node2),linestart(node3,node3),linestart(c_c,node3),
+        linestart(blue,node3),lineend(node1,a_c),lineend(a_c,red),
+        lineend(node2,red),lineend(b_c,green),lineend(node3,blue),
+        lineend(c_c,blue),lineend(red,red),lineend(green,green),
+        lineend(blue,blue))
+
+    solver = SWIProlog()
+    eval_fn1 = Coverage(return_upperbound=True)
+    learner = Aleph(solver,eval_fn1,max_body_literals=3,do_print=False) 
+
+    # 1. Consider the hypothesis: f1(word) :- word is the second word on a line
+    if True:
+        f1 = c_pred("f1",1,[token])
+        neg = {f1(x) for x in [node1,node2,node3,blue,green,red]}
+        pos = {f1(x) for x in [a_c,b_c,c_c]}
+        task = Task(positive_examples=pos, negative_examples=neg)
+        start = datetime.datetime.now()
+        prog = learner.learn(task,bk,None)
+        end = datetime.datetime.now()
+        print("Final program: {}".format(str(prog)))
+        print("Learning took {}s, and {} clauses were considered.".format((end-start).total_seconds(),learner._eval_fn._clauses_evaluated))
+
+
+    # 2. Consider the hypothesis: f2(word) :- word is the first word on a line
+    if True:
+        f2 = c_pred("f2",1,[token])
+        neg = {f1(x) for x in [a_c,b_c,c_c,blue,green,red]}
+        pos = {f1(x) for x in [node1,node2,node3]}
+        task2 = Task(positive_examples=pos, negative_examples=neg)
+        start = datetime.datetime.now()
+        prog = learner.learn(task2,bk,None)
+        end = datetime.datetime.now()
+        print("Final program: {}".format(str(prog)))
+        print("Learning took {}s, and {} clauses were considered.".format((end-start).total_seconds(),learner._eval_fn._clauses_evaluated))
+
+    # 3. Assume we have learned the predicate node(X) before (A, B and C and nodes).
+    # We want to learn f3(Node,X) :- X is the next token after Node
+    if True:
+        node = c_pred("node",1,[token])
+        color = c_pred("color",1,[token])
+        nodecolor = c_pred("nodecolor",2,[token,token])
+        a = c_var("A",token)
+        b = c_var("B",token)
+        bk_old = bk.get_all()
+        bk = Knowledge(*bk_old, node(a_c),node(b_c),node(c_c),
+                    node(a_c), node(b_c),node(c_c),
+                    color(red),color(green),color(blue))
+        pos = {nodecolor(a_c,red),nodecolor(b_c,green),nodecolor(c_c,blue)}
+        neg = set()
+        neg = {nodecolor(node1,red),nodecolor(node2,red),nodecolor(node3,red),
+               nodecolor(node1,blue),nodecolor(node2,blue),nodecolor(node2,blue),
+               nodecolor(node1,green),nodecolor(node2,green),nodecolor(node3,green),
+               nodecolor(a_c,green),nodecolor(a_c,blue),nodecolor(b_c,blue),
+               nodecolor(b_c,red),nodecolor(c_c,red),nodecolor(c_c,green)
+            }
+        task3 = Task(positive_examples=pos, negative_examples=neg)
+        start = datetime.datetime.now()
+        # prog = learner.learn(task3,bk,None,initial_clause=Body(node(a),color(b)))
+        prog = learner.learn(task3,bk,None,initial_clause=Body(node(a),color(b)),minimum_freq=3)
+        end = datetime.datetime.now()
+        print("Final program: {}".format(str(prog)))
+        print("Learning took {}s, and {} clauses were considered.".format((end-start).total_seconds(),learner._eval_fn._clauses_evaluated))        
+        
 
 def learn_simpsons():    
     # define the predicates
@@ -147,9 +220,9 @@ def learn_simpsons():
     eval_fn2 = Compression(return_upperbound=True)
     eval_fn3 = Compression(return_upperbound=True)
 
-    learner = Aleph(solver,eval_fn,max_body_literals=4,do_print=True)
-    learner2 = Aleph(solver,eval_fn2,max_body_literals=4,do_print=True)
-    learner3 = Aleph(solver,eval_fn3,max_body_literals=4,do_print=True)
+    learner = Aleph(solver,eval_fn,max_body_literals=4,do_print=False)
+    learner2 = Aleph(solver,eval_fn2,max_body_literals=4,do_print=False)
+    learner3 = Aleph(solver,eval_fn3,max_body_literals=4,do_print=False)
 
     start = datetime.datetime.now()
     pr = learner.learn(task,background,None)
@@ -165,9 +238,9 @@ def learn_simpsons():
 
 
 if __name__ == "__main__":
-    # instant()
-    # learn_simpsons()
+    learn_simpsons()
     learn_with_constants()
+    learn_text()
 
 
 

@@ -13,9 +13,7 @@ from loreleai.language.commons import (
     Not,
     Atom,
     Procedure,
-    c_pred,
-    c_var,
-    c_const
+    Body
 )
 from itertools import product, combinations_with_replacement
 from collections import Counter
@@ -51,7 +49,8 @@ class Aleph(TemplateLearner):
         self._max_body_literals = max_body_literals
 
     def learn(
-        self, examples: Task, knowledge: Knowledge, hypothesis_space: HypothesisSpace
+        self, examples: Task, knowledge: Knowledge, hypothesis_space: HypothesisSpace, initial_clause: typing.Union[Body,Clause] = None,
+        minimum_freq: int = 0
     ):
         """
         To find a hypothesis, Aleph uses the following set covering approach:
@@ -77,6 +76,10 @@ class Aleph(TemplateLearner):
         # parameters for aleph_extension()
         allowed_positions = find_allowed_positions(knowledge)
         allowed_reflexivity = find_allowed_reflexivity(knowledge)
+        if minimum_freq > 0:
+            allowed_constants = find_frequent_constants(knowledge,minimum_freq)
+        else:
+            allowed_constants = None
 
         while len(pos) > 0 and not stop:
             # Pick example from pos
@@ -89,20 +92,21 @@ class Aleph(TemplateLearner):
 
             # Predicates can only be picked from the body of the bottom clause
             body_predicates = list(
-                set(map(lambda l: l.get_predicate(), bottom.get_body().get_literals()))
+                set(map(
+                    lambda l: l.get_predicate(), 
+                    bottom.get_body().get_literals()))
             )
 
-            # Constants can only be picked from the literals in the bottom clause
-            constants = list(
-                set(
-                    list(
-                        filter(
-                            lambda l: isinstance(l, Constant),
-                            bottom.get_body().get_arguments(),
-                        )
-                    )
-                )
-            )
+            # Constants can only be picked from the literals in the bottom clause,
+            # and from constants that are frequent enough in bk (if applicable)
+            if allowed_constants is None:
+                allowed = lambda l: isinstance(l,Constant)
+            else:
+                allowed = lambda l: isinstance(l,Constant) and l in allowed_constants
+
+            constants = list(set(list(filter(
+                allowed,
+                bottom.get_body().get_arguments(),))))
             if self._print:
                 print("Constants in bottom clause: {}".format(constants))
 
@@ -119,7 +123,7 @@ class Aleph(TemplateLearner):
                 expansion_hooks_reject=[
                     #lambda x, y: has_singleton_vars(x, y),
                     lambda x, y: has_duplicated_literal(x, y),
-                ],
+                ],initial_clause=initial_clause
             )
 
             # Learn 1 clause and add to program
@@ -418,9 +422,11 @@ def find_allowed_positions(knowledge: Knowledge):
     Returns a dict x such that x[constant][predicate] contains
     all positions such i such that `predicate` can have `constant` as
     argument at position i in the background knowledge. 
-    This is used to
-    restrict the number of clauses generated through variable 
+    This is used to restrict the number of clauses generated through variable 
     instantiation.
+    If an atom is not implied by the background theory (i.e. is not in 
+    the Herbrand Model), there is no point in considering it, because
+    it will never be true.
     """
     facts = herbrand_model(list(knowledge.as_clauses()))
     predicates = set()
@@ -473,4 +479,19 @@ def find_allowed_reflexivity(knowledge: Knowledge):
     
     return allow_reflexivity
 
+def find_frequent_constants(knowledge: Knowledge,min_frequency=0):
+    facts = herbrand_model(list(knowledge.as_clauses()))
+    d = {}
+
+    # Count occurrences of constants
+    for atom in facts:
+        args = atom.get_head().get_arguments()
+        for arg in args: 
+            if isinstance(arg, Constant):
+                if arg not in d.keys():
+                    d[arg] = 0
+                else:
+                    d[arg] = d[arg] + 1
+    
+    return [const for const in d.keys() if d[const] >= min_frequency]
     

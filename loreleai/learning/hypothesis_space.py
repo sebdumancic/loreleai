@@ -121,7 +121,8 @@ class TopDownHypothesisSpace(HypothesisSpace):
         repetitions_in_head_variables: int = 2,
         expansion_hooks_keep: typing.Sequence = (),
         expansion_hooks_reject: typing.Sequence = (),
-        constants = None
+        constants = None,
+        initial_clause: typing.Union[Clause,Body] = None
     ):
         super().__init__(
             primitives,
@@ -138,11 +139,12 @@ class TopDownHypothesisSpace(HypothesisSpace):
         self._recursive_pointers_count = 0
         self._constants = constants
         self._recursive_pointer_prefix = "rec"
-        self.initialise()
+        self.initialise(initial_clause)
 
-    def initialise(self) -> None:
+    def initialise(self,initial_clause: typing.Union[Clause,Body]) -> None:
         """
-        Initialises the search space
+        Initialises the search space. It is possible to provide an initial
+        clause to initialize the hypothesis space with (instead of :-). 
         """
         if isinstance(self._head_constructor, (Predicate, FillerPredicate)):
             if isinstance(self._head_constructor, Predicate):
@@ -158,8 +160,14 @@ class TopDownHypothesisSpace(HypothesisSpace):
             else:
                 possible_heads = self._head_constructor.all_possible_atoms()
 
-            # create empty clause
-            clause = Body()
+            # create empty clause or use initial clause
+            if initial_clause:
+                clause = initial_clause if isinstance(initial_clause,Body) else initial_clause.get_body() 
+            else:
+                clause = Body()
+            if len(clause.get_literals()) > 0 and len(clause.get_variables()) < self._head_constructor.get_arity():
+                raise AssertionError("Cannot provide an initial clause with fewer distinct variables than the head predicate!")
+
             init_head_dict = {"ignored": False, "blocked": False, "visited": False}
             self._hypothesis_space.add_node(clause)
             self._hypothesis_space.nodes[clause]["heads"] = dict([(x, init_head_dict.copy()) for x in possible_heads])
