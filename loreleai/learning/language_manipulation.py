@@ -184,10 +184,11 @@ def plain_extension(
 
 class BottomClauseExpansion:
 
-    def __init__(self, clause: Clause):
+    def __init__(self, clause: Clause, only_connected_clauses: bool = False):
         self._clause: Clause = clause
         self._variable_literal_dependency: typing.Dict[Variable, typing.List[typing.Union[Atom, Not]]] = {}
         self._literal_order: typing.Dict[typing.Union[Atom, Not], int] = {}
+        self._only_connected_clauses = only_connected_clauses
 
         self._to_dependency_structure()
 
@@ -211,20 +212,26 @@ class BottomClauseExpansion:
     def _expand_clause(self, clause: typing.Union[Clause, Body]) -> typing.Sequence[typing.Union[Clause, Body]]:
         existing_vars = clause.get_variables()
         used_literals = {x for x in clause.get_literals()}
-        last_literal_id = self._literal_order.get(clause.get_literals()[-1], 0)
+        last_literal_id = self._literal_order.get(clause.get_literals()[-1], -1) if len(clause) > 0 else -1
 
         expansions = []
 
-        for v_ind in range(len(existing_vars)):
-            v = existing_vars[v_ind]
-            lits_to_add = [
-                x
-                for x in self._variable_literal_dependency.get(v, [])
-                if x not in used_literals and self._literal_order[x] > last_literal_id
-            ]
+        if self._only_connected_clauses:
+            for v_ind in range(len(existing_vars)):
+                v = existing_vars[v_ind]
+                lits_to_add = [
+                    x
+                    for x in self._variable_literal_dependency.get(v, [])
+                    if x not in used_literals and self._literal_order[x] > last_literal_id
+                ]
 
-            for l_ind in range(len(lits_to_add)):
-                expansions.append(clause + lits_to_add[l_ind])
+                for l_ind in range(len(lits_to_add)):
+                    expansions.append(clause + lits_to_add[l_ind])
+        else:
+            expansions = [
+                clause + l
+                for l in self._clause.get_literals()
+                if l not in used_literals and self._literal_order[l] > last_literal_id]
 
         return expansions
 
