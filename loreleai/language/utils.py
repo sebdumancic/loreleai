@@ -1,8 +1,7 @@
 from typing import Union, Sequence, Dict
 
 import networkx as nx
-
-from .commons import Predicate, Constant, Atom, Variable, c_fresh_var
+from pylo.language.lp import Predicate, Constant, Atom, Variable, c_fresh_var
 
 
 # MUZ = "muz"

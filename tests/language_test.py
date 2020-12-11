@@ -1,7 +1,7 @@
 from loreleai.language.lp import c_var, c_pred, c_const, Predicate, Constant, Variable, Clause, Atom, Disjunction
 from loreleai.learning.hypothesis_space import TopDownHypothesisSpace
 from loreleai.learning.language_filtering import has_singleton_vars, connected_clause
-from loreleai.learning.language_manipulation import plain_extension
+from loreleai.learning.language_manipulation import plain_extension, BottomClauseExpansion
 
 
 class LanguageTest:
@@ -155,18 +155,41 @@ class HypothesisSpace():
         expansion2 = hs.expand(expansions[1])
         assert len(expansion2) == 16
 
+    def bottom_up(self):
+        a = c_pred("a", 2)
+        b = c_pred("b", 2)
+        c = c_pred("c", 1)
+        h = c_pred("h", 2)
+
+        cl = h("X", "Y") <= a("X", "Z") & b("Z", "Y") & c("X")
+
+        bc = BottomClauseExpansion(cl)
+
+        hs = TopDownHypothesisSpace(primitives=[lambda x: bc.expand(x)],
+                                    head_constructor=h)
+
+        cls = hs.get_current_candidate()
+        assert len(cls) == 3
+
+        exps = hs.expand(cls[1])
+        assert len(exps) == 2
+
+        exps2 = hs.expand(exps[0])
+        assert len(exps2) == 4
+
 
 def test_language():
-    #test = LanguageTest()
-    # test.manual_constructs()
+    test = LanguageTest()
+    test.manual_constructs()
 
-    #test_bias = LanguageManipulationTest()
-    # test_bias.plain_clause_extensions()
-    # test_bias.plain_clause_extensions_connected()
-    #test_bias.plain_procedure_extension()
+    test_bias = LanguageManipulationTest()
+    test_bias.plain_clause_extensions()
+    test_bias.plain_clause_extensions_connected()
+    test_bias.plain_procedure_extension()
 
     test_hypothesis_space = HypothesisSpace()
-    #test_hypothesis_space.top_down_plain()
+    test_hypothesis_space.top_down_plain()
     test_hypothesis_space.top_down_limited()
+    test_hypothesis_space.bottom_up()
 
 test_language()

@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='loreleai',
-      version='0.1',
+      version='0.1.2',
       description='A library for program induction/synthesis and StarAI',
       long_description=long_description,
       long_description_content_type='text/markdown',
@@ -18,7 +18,6 @@ setup(name='loreleai',
           'pytest',
           'networkx',
           'matplotlib',
-          'pygraphviz',
           'z3-solver',
           'miniKanren',
           'orderedset'

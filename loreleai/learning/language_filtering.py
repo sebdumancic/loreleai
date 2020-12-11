@@ -1,6 +1,6 @@
 from functools import reduce
 
-from loreleai.language.commons import Body, Atom, Not, Predicate
+from loreleai.language.lp import Body, Atom, Not, Predicate
 from .utilities import are_variables_connected
 
 """
