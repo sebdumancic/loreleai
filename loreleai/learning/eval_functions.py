@@ -1,7 +1,7 @@
 import typing
 from abc import ABC, abstractmethod
 from typing import Sequence
-from loreleai.language.commons import Clause, Atom
+from loreleai.language.lp import Clause, Atom
 from loreleai.learning.task import Task
 import math
 

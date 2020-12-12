@@ -5,7 +5,7 @@ from orderedset import OrderedSet
 
 from loreleai.learning.abstract_learners import Learner, TemplateLearner
 from loreleai.learning import Task, Knowledge, HypothesisSpace, TopDownHypothesisSpace
-from loreleai.language.commons import (
+from loreleai.language.lp import (
     Clause,
     Constant,
     c_type,
@@ -73,11 +73,15 @@ class Aleph(TemplateLearner):
         i = 1
         stop = False
 
+
         # parameters for aleph_extension()
         allowed_positions = find_allowed_positions(knowledge)
+
         allowed_reflexivity = find_allowed_reflexivity(knowledge)
+
         if minimum_freq > 0:
             allowed_constants = find_frequent_constants(knowledge,minimum_freq)
+
         else:
             allowed_constants = None
 
@@ -307,7 +311,6 @@ class Aleph(TemplateLearner):
         Computes the bottom clause given a theory and a clause.
         Algorithm from (De Raedt,2008)
         """
-
         # 1. Find a skolemization substitution θ for c (w.r.t. B and c)
         _, theta = self._skolemize(c)
 
@@ -315,6 +318,7 @@ class Aleph(TemplateLearner):
         body_facts = [
             Clause(l.substitute(theta), []) for l in c.get_body().get_literals()
         ]
+
         m = herbrand_model(theory + body_facts)
 
         # 3. Deskolemize the clause head(cθ) <= M and return the result.
@@ -329,13 +333,11 @@ class Aleph(TemplateLearner):
         subst = {vars[i]: Constant(f"sk{i}", c_type("thing")) for i in range(len(vars))}
 
         # Apply this substitution to create new clause without quantifiers
-        b = []
-        h = clause.get_head().substitute(subst)
-        for lit in clause.get_body().get_literals():
-            b.append(lit.substitute(subst))
-
-        # Return both new clause and mapping
-        return Clause(h, b), subst
+        # b = []
+        # h = clause.get_head().substitute(subst)
+        # # for lit in clause.get_body().get_literals():
+        # #     b.append(lit.substitute(subst))
+        return clause.substitute(subst), subst
 
 
 
@@ -370,8 +372,14 @@ def herbrand_model(clauses: Sequence[Clause]) -> Sequence[Clause]:
             "Theory does not contain ground facts, which necessary to compute a minimal Herbrand model!"
         )
     # print("Finished iteration 0")
+
+    # If all clauses are just facts, there is nothing to be done.
+    if len(facts) == len(clauses):
+        return clauses
+
+    #BUG: doesn't work properly after pylo update...
+
     m[1] = list(facts)
-    # print(m[1])
     while Counter(m[i]) != Counter(m[i - 1]):
         model_constants = _flatten(
             [fact.get_head().get_arguments() for fact in m[i]]

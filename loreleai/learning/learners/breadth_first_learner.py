@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 from loreleai.learning.abstract_learners import TemplateLearner
 from loreleai.reasoning.lp import LPSolver
-from loreleai.language.commons import Clause,Atom,Procedure
+from loreleai.language.lp import Clause,Atom,Procedure
 from loreleai.learning.task import Task, Knowledge
 from loreleai.learning.hypothesis_space import TopDownHypothesisSpace
 from loreleai.learning.eval_functions import EvalFunction

@@ -2,7 +2,7 @@ import datetime
 
 from loreleai.learning.learners import Aleph
 from loreleai.learning.task import Task,Knowledge
-from loreleai.language.commons import c_type,Clause, Term, Variable, Constant, c_pred,c_const,c_var, Body
+from loreleai.language.lp import c_type,Clause, Term, Variable, Constant, c_pred,c_const,c_var, Body
 from loreleai.learning import HypothesisSpace
 from loreleai.reasoning.lp.prolog import SWIProlog
 from loreleai.reasoning.lp.datalog import MuZ
@@ -36,7 +36,7 @@ def learn_with_constants():
     green = c_const("green",domain="col")
     blue = c_const("blue",domain="col")
 
-    follows = c_pred("next",2,domains=[block,block])
+    follows = c_pred("follows",2,domains=[block,block])
     color = c_pred("color",2,domains=[block,col])
     
     # Predicate to learn:
@@ -238,9 +238,9 @@ def learn_simpsons():
 
 
 if __name__ == "__main__":
-    learn_simpsons()
+    # learn_simpsons()
     learn_with_constants()
-    learn_text()
+    # learn_text()
 
 
 

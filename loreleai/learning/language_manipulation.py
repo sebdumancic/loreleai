@@ -12,7 +12,7 @@ from loreleai.language.lp import (
     Recursion,
     Not,
     Body,
-    Constant
+    Constant,
     Atom
 )
 
@@ -227,7 +227,6 @@ def plain_extension(
 
         return extensions
 
-<<<<<<< HEAD
 def aleph_extension(
     clause: typing.Union[Clause, Body, Procedure],
     predicate: Predicate,
@@ -306,7 +305,6 @@ def _not_grounded(cl):
         
 
 
-=======
 
 class BottomClauseExpansion:
 
@@ -390,4 +388,3 @@ class BottomClauseExpansion:
                         extensions.append(Recursion(cls))
 
             return extensions
->>>>>>> upstream/master

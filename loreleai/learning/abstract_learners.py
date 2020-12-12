@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 
 from loreleai.reasoning.lp import LPSolver
 from loreleai.learning.task import Knowledge, Task
-from loreleai.language.commons import Clause,Atom,Procedure
+from loreleai.language.lp import Clause,Atom,Procedure
 from loreleai.learning.hypothesis_space import TopDownHypothesisSpace, HypothesisSpace
 from loreleai.learning.eval_functions import EvalFunction
 import datetime
@@ -52,13 +52,13 @@ class TemplateLearner(Learner):
         """
         facts = knowledge.get_atoms()
         for f_ind in range(len(facts)):
-            self._solver.assert_fact(facts[f_ind])
-            # self._solver.assertz(facts[f_ind])
+            # self._solver.assert_fact(facts[f_ind])
+            self._solver.assertz(facts[f_ind])
 
         clauses = knowledge.get_clauses()
         for cl_ind in range(len(clauses)):
-            self._solver.assert_rule(clauses[cl_ind])
-            # self._solver.assertz(clauses[cl_ind])
+            # self._solver.assert_rule(clauses[cl_ind])
+            self._solver.assertz(clauses[cl_ind])
 
     def _execute_program(self, clause: Clause) -> typing.Sequence[Atom]:
         """
