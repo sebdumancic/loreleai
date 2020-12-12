@@ -49,8 +49,8 @@ class Aleph(TemplateLearner):
         self._max_body_literals = max_body_literals
 
     def learn(
-        self, examples: Task, knowledge: Knowledge, hypothesis_space: HypothesisSpace, initial_clause: typing.Union[Body,Clause] = None,
-        minimum_freq: int = 0
+        self, examples: Task, knowledge: Knowledge, hypothesis_space: HypothesisSpace, 
+        initial_clause: typing.Union[Body,Clause] = None, minimum_freq: int = 0
     ):
         """
         To find a hypothesis, Aleph uses the following set covering approach:
@@ -92,7 +92,7 @@ class Aleph(TemplateLearner):
             bottom = self._compute_bottom_clause(bk, pos_ex)
             if self._print:
                 print("Next iteration: generalizing example {}".format(str(pos_ex)))
-                print("Bottom clause: " + str(bottom))
+                # print("Bottom clause: " + str(bottom))
 
             # Predicates can only be picked from the body of the bottom clause
             body_predicates = list(
@@ -104,15 +104,17 @@ class Aleph(TemplateLearner):
             # Constants can only be picked from the literals in the bottom clause,
             # and from constants that are frequent enough in bk (if applicable)
             if allowed_constants is None:
-                allowed = lambda l: isinstance(l,Constant)
+                allowed = lambda l: isinstance(l,Constant) or isinstance(l,int)
             else:
-                allowed = lambda l: isinstance(l,Constant) and l in allowed_constants
+                allowed = lambda l: (isinstance(l,Constant) and l in allowed_constants) or isinstance(l,int)
 
+            print("All arguments: {}".format(bottom.get_body().get_arguments()))
             constants = list(set(list(filter(
                 allowed,
                 bottom.get_body().get_arguments(),))))
             if self._print:
                 print("Constants in bottom clause: {}".format(constants))
+                print("Predicates in bottom clause: {}".format(body_predicates))
 
             # IMPORTANT: use VALUES of pred and constants, not the variables
             # Has something to do with closures 
