@@ -108,7 +108,8 @@ class Aleph(TemplateLearner):
             else:
                 allowed = lambda l: (isinstance(l,Constant) and l in allowed_constants) or isinstance(l,int)
 
-            print("All arguments: {}".format(bottom.get_body().get_arguments()))
+            # print("All arguments: {}".format(bottom.get_body().get_arguments()))
+
             constants = list(set(list(filter(
                 allowed,
                 bottom.get_body().get_arguments(),))))
@@ -293,6 +294,8 @@ class Aleph(TemplateLearner):
                         len_before = len(self._candidate_pool)
                         self.prune_pool(value[c])
                         len_after = len(self._candidate_pool)
+
+                        print("Found new best: {}: {} {}".format(c,self._eval_fn.name(),value[c]))
 
                         if self._print:
                             print("Found new best: {}: {} {}".format(c,self._eval_fn.name(),value[c]))

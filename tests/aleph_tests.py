@@ -11,6 +11,7 @@ from loreleai.learning.language_manipulation import plain_extension, variable_in
 from loreleai.learning.hypothesis_space import TopDownHypothesisSpace
 from loreleai.learning.language_filtering import has_duplicated_literal, has_singleton_vars
 
+
 def learn_with_constants():
     """
     Consider a row of blocks [ block1 block2 block3 block4 block5 block6 ]
