@@ -35,7 +35,7 @@
 
 from pylo.language.lp import Term, Constant, Variable, Structure, Predicate, Type, Program, c_pred, c_const, \
     c_id_to_const, c_var, c_literal, c_find_domain, c_functor, c_symbol, Clause, Atom, Not, c_fresh_var, Literal, \
-    Procedure, Disjunction, Recursion, Functor, list_func, List, Body, c_type
+    Procedure, Disjunction, Recursion, Functor, list_func, List, Body, c_type, Pair
 
 from ..utils import triplet
 
@@ -68,5 +68,6 @@ __all__ = [
     "list_func",
     "List",
     "Body",
-    "c_type"
+    "c_type",
+    "Pair"
 ]
