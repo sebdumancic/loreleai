@@ -99,18 +99,28 @@ class TemplateLearner(Learner):
         """
         raise NotImplementedError()
 
-    def evaluate(self, examples: Task, clause: Clause) -> typing.Union[int, float]:
+    def evaluate(self, examples: Task, clause: Clause, hypothesis_space: HypothesisSpace) -> typing.Union[int, float]:
         """
         Evaluates a clause evaluating the Learner's eval_fn
         Returns a number (the higher the better)
         """
-        covered = self._execute_program(clause)
-        # if 'None', i.e. trivial hypothesis, all clauses are covered
-        if covered is None:
-            pos,neg = examples.get_examples()
-            covered = pos.union(neg)
+        # add_to_cache(node,key,val)
+        # retrieve_from_cache(node,key) -> val or None
+        # remove_from_cache(node,key) -> None
 
-        return self._eval_fn.evaluate(clause,examples,covered)
+        val = hypothesis_space.retrieve_from_cache(clause,"qual")
+        if val is None:
+            covered = self._execute_program(clause)
+            # if 'None', i.e. trivial hypothesis, all clauses are covered
+            if covered is None:
+                pos,neg = examples.get_examples()
+                covered = pos.union(neg)
+
+            result = self._eval_fn.evaluate(clause,examples,covered)
+            hypothesis_space.add_to_cache(clause,"qual",result)
+            return result
+        else:
+            return val
 
     @abstractmethod
     def stop_inner_search(self, eval: typing.Union[int, float], examples: Task, clause: Clause) -> bool:
@@ -160,7 +170,7 @@ class TemplateLearner(Learner):
             # add into pool
             self.put_into_pool(exps)
 
-            score = self.evaluate(examples, current_cand)
+            score = self.evaluate(examples, current_cand, hypothesis_space)
 
         if self._print:
             print(f"- New clause: {current_cand}")

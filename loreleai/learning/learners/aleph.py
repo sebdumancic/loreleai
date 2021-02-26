@@ -25,6 +25,11 @@ from loreleai.learning.language_filtering import (
 )
 from loreleai.learning.eval_functions import EvalFunction, Coverage
 from loreleai.learning.language_manipulation import variable_instantiation
+from loreleai.learning.utilities import (
+    compute_bottom_clause, 
+    find_allowed_positions, 
+    find_allowed_reflexivity, 
+    find_frequent_constants)
 
 
 class Aleph(TemplateLearner):
@@ -89,7 +94,7 @@ class Aleph(TemplateLearner):
             # Pick example from pos
             pos_ex = Clause(list(pos)[0], [])
             bk = knowledge.as_clauses()
-            bottom = self._compute_bottom_clause(bk, pos_ex)
+            bottom = compute_bottom_clause(bk, pos_ex)
             if self._print:
                 print("Next iteration: generalizing example {}".format(str(pos_ex)))
                 # print("Bottom clause: " + str(bottom))
@@ -253,7 +258,7 @@ class Aleph(TemplateLearner):
         initial_clauses = hypothesis_space.get_current_candidate()
         self.put_into_pool(
             [
-                (cl, self.evaluate(examples, cl)[0], self.evaluate(examples, cl)[1])
+                (cl, self.evaluate(examples, cl,hypothesis_space)[0], self.evaluate(examples, cl,hypothesis_space)[1])
                 for cl in initial_clauses
             ]
         )
@@ -276,9 +281,9 @@ class Aleph(TemplateLearner):
                 examples, new_clauses, hypothesis_space
             )
             # Compute costs for these children
-            value = {cl: self.evaluate(examples, cl)[0] for cl in new_clauses}
+            value = {cl: self.evaluate(examples, cl, hypothesis_space)[0] for cl in new_clauses}
             upperbound_value = {
-                cl: self.evaluate(examples, cl)[1] for cl in new_clauses
+                cl: self.evaluate(examples, cl, hypothesis_space)[1] for cl in new_clauses
             }
            
             #print("new_clauses: {}, {}".format(len(new_clauses),[(cl,value[cl]) for cl in new_clauses]))
@@ -310,201 +315,3 @@ class Aleph(TemplateLearner):
         if self._print:
             print("New clause: {} with score {}".format(currentbest,currentbestvalue))
         return currentbest
-
-    def _compute_bottom_clause(self, theory: Sequence[Clause], c: Clause) -> Clause:
-        """
-        Computes the bottom clause given a theory and a clause.
-        Algorithm from (De Raedt,2008)
-        """
-        # 1. Find a skolemization substitution θ for c (w.r.t. B and c)
-        _, theta = self._skolemize(c)
-
-        # 2. Compute the least Herbrand model M of theory ¬body(c)θ
-        body_facts = [
-            Clause(l.substitute(theta), []) for l in c.get_body().get_literals()
-        ]
-
-        m = herbrand_model(theory + body_facts)
-
-        # 3. Deskolemize the clause head(cθ) <= M and return the result.
-        theta_inv = {value: key for key, value in theta.items()}
-        return Clause(c.get_head(), [l.get_head().substitute(theta_inv) for l in m])
-
-    def _skolemize(self, clause: Clause) -> Clause:
-        # Find all variables in clause
-        vars = clause.get_variables()
-
-        # Map from X,Y,Z,... -> sk0,sk1,sk2,...
-        subst = {vars[i]: Constant(f"sk{i}", c_type("thing")) for i in range(len(vars))}
-
-        # Apply this substitution to create new clause without quantifiers
-        # b = []
-        # h = clause.get_head().substitute(subst)
-        # # for lit in clause.get_body().get_literals():
-        # #     b.append(lit.substitute(subst))
-        return clause.substitute(subst), subst
-
-
-
-def _flatten(l) -> Sequence:
-    """
-    [[1],[2],[3]] -> [1,2,3]
-    """
-    return [item for sublist in l for item in sublist]
-
-
-def _all_maps(l1, l2) -> Sequence[Dict[Variable, Constant]]:
-    """
-    Return all maps between l1 and l2
-    such that all elements of l1 have an entry in the map
-    """
-    sols = []
-    for c in combinations_with_replacement(l2, len(l1)):
-        sols.append({l1[i]: c[i] for i in range(len(l1))})
-    return sols
-
-def herbrand_model(clauses: Sequence[Clause]) -> Sequence[Clause]:
-    """
-    Computes a minimal Herbrand model of a theory 'clauses'.
-    Algorithm from (De Raedt, 2008)
-    """
-    i = 1
-    m = {0: []}
-    # Find a fact in the theory (i.e. no body literals)
-    facts = list(filter(lambda c: len(c.get_body().get_literals()) == 0, clauses))
-    if len(facts) == 0:
-        raise AssertionError(
-            "Theory does not contain ground facts, which necessary to compute a minimal Herbrand model!"
-        )
-    # print("Finished iteration 0")
-
-    # If all clauses are just facts, there is nothing to be done.
-    if len(facts) == len(clauses):
-        return clauses
-
-    #BUG: doesn't work properly after pylo update...
-
-    m[1] = list(facts)
-    while Counter(m[i]) != Counter(m[i - 1]):
-        model_constants = _flatten(
-            [fact.get_head().get_arguments() for fact in m[i]]
-        )
-
-        m[i + 1] = []
-        rules = list(
-            filter(lambda c: len(c.get_body().get_literals()) > 0, clauses)
-        )
-
-        for rule in rules:
-            # if there is a substition theta such that
-            # all literals in rule._body are true in the previous model
-            body = rule.get_body()
-            body_vars = body.get_variables()
-            # Build all substitutions body_vars -> model_constants
-            substitutions = _all_maps(body_vars, model_constants)
-
-            for theta in substitutions:
-                # add_rule is True unless there is some literal that never
-                # occurs in m[i]
-                add_fact = True
-                for body_lit in body.get_literals():
-                    candidate = body_lit.substitute(theta)
-                    facts = list(map(lambda x: x.get_head(), m[i]))
-                    # print("Does {} occur in {}?".format(candidate,facts))
-                    if candidate in facts:
-                        pass
-                        # print("Yes")
-                    else:
-                        add_fact = False
-
-                new_fact = Clause(rule.get_head().substitute(theta), [])
-
-                if add_fact and not new_fact in m[i + 1] and not new_fact in m[i]:
-                    m[i + 1].append(new_fact)
-                    # print("Added fact {} to m[{}]".format(str(new_fact),i+1))
-                    # print(m[i+1])
-
-        # print(f"Finished iteration {i}")
-        m[i + 1] = list(set(m[i + 1] + m[i]))
-        # print("New model: "+str(m[i+1]))
-        i += 1
-    return m[i]
-
-def find_allowed_positions(knowledge: Knowledge):
-    """
-    Returns a dict x such that x[constant][predicate] contains
-    all positions such i such that `predicate` can have `constant` as
-    argument at position i in the background knowledge. 
-    This is used to restrict the number of clauses generated through variable 
-    instantiation.
-    If an atom is not implied by the background theory (i.e. is not in 
-    the Herbrand Model), there is no point in considering it, because
-    it will never be true.
-    """
-    facts = herbrand_model(list(knowledge.as_clauses()))
-    predicates = set()
-    
-    # Build dict that will restrict where constants are allowed to appear
-    # e.g. allowed_positions[homer][father] = [0,1]
-    allowed_positions = dict()
-    for atom in facts:
-        args = atom.get_head().get_arguments()
-        pred = atom.get_head().get_predicate()
-        predicates = predicates.union({pred})
-        for i in range(len(args)):
-            arg = args[i]
-            if isinstance(arg,Constant):
-                # New constant, initialize allowed_positions[constant]
-                if not arg in allowed_positions.keys():
-                    allowed_positions[arg] = dict()
-                # Known constant, but not for this predicate
-                if not pred in allowed_positions[arg]:
-                    allowed_positions[arg][pred] = [i]
-                    # Known constant, and predicate already seen for this constant
-                else:
-                    if i not in allowed_positions[arg][pred]:
-                        allowed_positions[arg][pred] = allowed_positions[arg][pred]+[i]
-    
-    # Complete dict with empty lists for constant/predicate combinations
-    # that were not observed in the background data
-    for const in allowed_positions.keys():
-        for pred in list(predicates):
-            if pred not in allowed_positions[const].keys():
-                allowed_positions[const][pred] = []
-
-    return allowed_positions
-
-def find_allowed_reflexivity(knowledge: Knowledge):
-    """
-    Returns a set of predicates that allow all of its
-    arguments to be equal. This is used to prune clauses
-    after variable instantiation
-    """
-    facts = herbrand_model(list(knowledge.as_clauses()))
-    allow_reflexivity = set()
-    for atom in facts:
-        args = atom.get_head().get_arguments()
-        pred = atom.get_head().get_predicate()
-        if len(args) > 0:
-            # If all arguments are equal
-            if all(args[i] == args[0] for i in range(len(args))):
-                allow_reflexivity.add(pred)
-    
-    return allow_reflexivity
-
-def find_frequent_constants(knowledge: Knowledge,min_frequency=0):
-    facts = herbrand_model(list(knowledge.as_clauses()))
-    d = {}
-
-    # Count occurrences of constants
-    for atom in facts:
-        args = atom.get_head().get_arguments()
-        for arg in args: 
-            if isinstance(arg, Constant):
-                if arg not in d.keys():
-                    d[arg] = 0
-                else:
-                    d[arg] = d[arg] + 1
-    
-    return [const for const in d.keys() if d[const] >= min_frequency]
-    

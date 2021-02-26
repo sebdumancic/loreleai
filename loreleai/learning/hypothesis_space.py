@@ -309,6 +309,8 @@ class TopDownHypothesisSpace(HypothesisSpace):
         else:
             head, body = node.get_head(), node.get_body()
             if head in self._hypothesis_space.nodes[body]["heads"]:
+                if "cache" not in self._hypothesis_space.nodes[body]["heads"][head]:
+                    self._hypothesis_space.nodes[body]["heads"][head]["cache"] = {}
                 self._hypothesis_space.nodes[body]["heads"][head]["cache"][key] = val
 
     def retrieve_from_cache(self, node: typing.Union[Clause, Procedure], key):
@@ -324,7 +326,9 @@ class TopDownHypothesisSpace(HypothesisSpace):
             raise NotImplementedError("no support for caching with procedures currently")
         else:
             head, body = node.get_head(), node.get_body()
-            if head in self._hypothesis_space.nodes[body]["heads"]:
+            if head in self._hypothesis_space.nodes[body]["heads"]  \
+                and "cache" in self._hypothesis_space.nodes[body]["heads"][head] \
+                    and key in self._hypothesis_space.nodes[body]["heads"][head]["cache"]:
                 return self._hypothesis_space.nodes[body]["heads"][head]["cache"][key]
             else:
                 return None
