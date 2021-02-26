@@ -265,7 +265,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
             possible_heads = [x for x in possible_heads if not any([f(x, node) for f in self._expansion_hooks_reject])]
 
         if possible_heads:
-            init_head_dict = {"ignored": False, "blocked": False, "visited": False}
+            init_head_dict = {"ignored": False, "blocked": False, "visited": False, "cache": {}}
             possible_heads = dict([(x, init_head_dict.copy()) for x in possible_heads])
 
             self._hypothesis_space.add_node(
@@ -293,6 +293,57 @@ class TopDownHypothesisSpace(HypothesisSpace):
         # if child not in self._hypothesis_space.nodes:
         #     self._insert_node(child)
         self._hypothesis_space.add_edge(parent, child)
+
+    def add_to_cache(self, node: typing.Union[Clause, Procedure], key, val) -> None:
+        """
+        Adds a key-value pair to the cache of a particular clause
+        (body of the clause is the node, head is on of the attributes)
+
+        Arguments:
+            node [Clause, Procedure]: clause to associate the key-value pair with
+            key: key to use
+            val: value to store
+        """
+        if isinstance(node, Procedure):
+            raise NotImplementedError("no support for caching with procedures currently")
+        else:
+            head, body = node.get_head(), node.get_body()
+            if head in self._hypothesis_space.nodes[body]["heads"]:
+                self._hypothesis_space.nodes[body]["heads"][head]["cache"][key] = val
+
+    def retrieve_from_cache(self, node: typing.Union[Clause, Procedure], key):
+        """
+        Retrieves the value associate with the key from the cache of the clause
+
+        Arguments:
+            node: clause of interest
+            key: key in the cache dict
+
+        """
+        if isinstance(node, Procedure):
+            raise NotImplementedError("no support for caching with procedures currently")
+        else:
+            head, body = node.get_head(), node.get_body()
+            if head in self._hypothesis_space.nodes[body]["heads"]:
+                return self._hypothesis_space.nodes[body]["heads"][head]["cache"][key]
+            else:
+                return None
+
+    def remove_from_cache(self, node: typing.Union[Clause,Procedure], key):
+        """
+        Removes the key from the cache associate with the clause
+
+        Arguments:
+            node: clause of interest
+            key: key to delete
+        """
+        if isinstance(node, Procedure):
+            raise NotImplementedError("no support for caching with procedures currently")
+        else:
+            head, body = node.get_head(), node.get_body()
+            if head in self._hypothesis_space.nodes[body]["heads"]:
+                del self._hypothesis_space.nodes[body]["heads"][head]["cache"][key]
+
 
     def register_pointer(self, name: str, init_value: Body = None):
         """
