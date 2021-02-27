@@ -101,15 +101,24 @@ class TemplateLearner(Learner):
 
     def evaluate(self, examples: Task, clause: Clause, hypothesis_space: HypothesisSpace) -> typing.Union[int, float]:
         """
-        Evaluates a clause evaluating the Learner's eval_fn
+        Evaluates a clause by calling the Learner's eval_fn.
         Returns a number (the higher the better)
         """
         # add_to_cache(node,key,val)
         # retrieve_from_cache(node,key) -> val or None
         # remove_from_cache(node,key) -> None
+        
+        # Cache holds sets of examples that were covered before
+        covered = hypothesis_space.retrieve_from_cache(clause,"covered")
 
-        val = hypothesis_space.retrieve_from_cache(clause,"qual")
-        if val is None:
+        # We have executed this clause before
+        if covered is not None:
+            # Note that _eval.fn.evaluate() will ignore clauses in `covered`
+            # that are not in the current Task
+            result = self._eval_fn.evaluate(clause,examples,covered)
+            # print("No query here.")
+            return result
+        else:
             covered = self._execute_program(clause)
             # if 'None', i.e. trivial hypothesis, all clauses are covered
             if covered is None:
@@ -117,10 +126,8 @@ class TemplateLearner(Learner):
                 covered = pos.union(neg)
 
             result = self._eval_fn.evaluate(clause,examples,covered)
-            hypothesis_space.add_to_cache(clause,"qual",result)
+            hypothesis_space.add_to_cache(clause,"covered",covered)
             return result
-        else:
-            return val
 
     @abstractmethod
     def stop_inner_search(self, eval: typing.Union[int, float], examples: Task, clause: Clause) -> bool:

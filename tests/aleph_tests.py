@@ -87,10 +87,10 @@ def learn_text():
     lineend = c_pred("lineend",2,("token","token"))
     tokenlength = c_pred("tokenlength",2,("token","num"))
 
-    n1 = c_const("1",num)
-    n3 = c_const("3",num)
-    n4 = c_const("4",num)
-    n5 = c_const("5",num)
+    n1 = c_const("n1",num)
+    n3 = c_const("n3",num)
+    n4 = c_const("n4",num)
+    n5 = c_const("n5",num)
     node1 = c_const("node1",token)
     node2 = c_const("node2",token)
     node3 = c_const("node3",token)
@@ -100,8 +100,8 @@ def learn_text():
     a_c = c_const("a_c",token)
     b_c = c_const("b_c",token)
     c_c = c_const("c_c",token)
-    start = c_const("START",token)
-    end = c_const("END",token)
+    start = c_const("c_START",token)
+    end = c_const("c_END",token)
     
     bk = Knowledge(
         next(start,node1),next(node1,a_c),next(a_c,red),
@@ -239,9 +239,9 @@ def learn_simpsons():
 
 
 if __name__ == "__main__":
-    # learn_simpsons()
+    learn_simpsons()
     learn_with_constants()
-    # learn_text()
+    learn_text()
 
 
 

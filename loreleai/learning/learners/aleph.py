@@ -81,12 +81,9 @@ class Aleph(TemplateLearner):
 
         # parameters for aleph_extension()
         allowed_positions = find_allowed_positions(knowledge)
-
         allowed_reflexivity = find_allowed_reflexivity(knowledge)
-
         if minimum_freq > 0:
             allowed_constants = find_frequent_constants(knowledge,minimum_freq)
-
         else:
             allowed_constants = None
 
