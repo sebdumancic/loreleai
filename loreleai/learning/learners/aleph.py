@@ -95,7 +95,18 @@ class Aleph(TemplateLearner):
         if minimum_freq > 0:
             allowed_constants = find_frequent_constants(knowledge,minimum_freq)
         else:
-            allowed_constants = None
+            allowed_constants = None        
+
+        # Create HypothesisSpace: primitives will be different in each iteration 
+        # (based on the chosen positive example)
+        hs = TopDownHypothesisSpace(
+            primitives=[],
+            head_constructor=list(pos)[0].get_predicate(),
+            expansion_hooks_reject=[
+                lambda x, y: has_duplicated_literal(x, y),
+            ],
+            initial_clause=initial_clause
+        )
 
         while len(pos) > 0 and not stop:
             i += 1
@@ -132,25 +143,18 @@ class Aleph(TemplateLearner):
             # IMPORTANT: use VALUES of pred and constants, not the variables
             # Has something to do with closures 
             extensions = [
-                lambda x,y=pred,z=constants: aleph_extension(x,y,allowed_positions,z,allowed_reflexivity) for pred in body_predicates
+                lambda x,a=pred,b=allowed_positions,c=constants,d=allowed_reflexivity: aleph_extension(x,a,b,c,d) for pred in body_predicates
             ]
 
-            # Create hypothesis space
-            hs = TopDownHypothesisSpace(
-                primitives=extensions,
-                head_constructor=pos_ex.get_head().get_predicate(),
-                expansion_hooks_reject=[
-                    #lambda x, y: has_singleton_vars(x, y),
-                    lambda x, y: has_duplicated_literal(x, y),
-                ],initial_clause=initial_clause
-            )
+            # Update hypothesis space for this iteration
+            hs._primitives = extensions
+            hs.remove_all_edges()
 
             # Learn 1 clause and add to program
             cl = self._learn_one_clause(examples_to_use, hs)
             prog.append(cl)
             if self._print:
                 print("- New clause: " + str(cl))
-
 
             # update covered positive examples
             covered = self._execute_program(cl)
@@ -312,8 +316,6 @@ class Aleph(TemplateLearner):
                 cl: self.evaluate(examples, cl, hypothesis_space)[1] for cl in new_clauses
             }
            
-            #print("new_clauses: {}, {}".format(len(new_clauses),[(cl,value[cl]) for cl in new_clauses]))
-
             for c in new_clauses:
                 # If upper bound too low, don't bother expanding
                 if upperbound_value[c] <= currentbestvalue and not c == currentbest:

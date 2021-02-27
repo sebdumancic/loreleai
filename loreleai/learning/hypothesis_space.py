@@ -4,6 +4,7 @@ from functools import reduce
 from itertools import combinations_with_replacement, combinations
 
 import networkx as nx
+from networkx.classes.function import create_empty_copy
 from orderedset import OrderedSet
 
 from loreleai.language.lp import (
@@ -377,7 +378,6 @@ class TopDownHypothesisSpace(HypothesisSpace):
             exp = self._primitives[item](node)
             expansions = expansions.union(exp)
 
-
         # if recursions should be enumerated when FillerPredicate is used to construct the heads
         if isinstance(self._head_constructor, FillerPredicate) and self._use_recursions:
             recursive_cases = self._head_constructor.add_to_body(node)
@@ -690,3 +690,5 @@ class TopDownHypothesisSpace(HypothesisSpace):
             body = self._extract_body(node)
             return reduce(lambda x, y: x + y, [self.retrieve_clauses_from_body(x) for x in self._hypothesis_space.successors(body)], [])
 
+    def remove_all_edges(self):
+        self._hypothesis_space = create_empty_copy(self._hypothesis_space,with_data=True)
