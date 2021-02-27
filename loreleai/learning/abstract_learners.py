@@ -13,7 +13,7 @@ class Learner(ABC):
     Base class for all learners
     """
     def __init__(self):
-        raise NotImplementedError()
+        self._learnresult = LearnResult()
 
     @abstractmethod
     def learn(self, examples: Task, knowledge: Knowledge, hypothesis_space: HypothesisSpace):
@@ -38,6 +38,30 @@ It is implemented as a template learner - you still need to provide the followin
 The learner does not handle recursions correctly!
 """
 
+class LearnResult:
+    """
+    The LearnResult class holds statistics about the learning process.
+    It is implemented as a dict and supports indexing [] as usual.
+    """
+    def __init__(self):
+        self.info = dict()
+
+    def __getitem__(self,key):
+        return self.info[key]
+
+    def __setitem__(self,key,val):
+        self.info[key] = val
+    
+    def __repr__(self):
+        max_keylength = max([len(str(k)) for k in self.info.keys()])
+        output_str = "Result of learning: \n"
+
+        for key,val in self.info.items():
+            output_str += str(key) + ":" + " "*(max_keylength - len(str(key))+2) + str(val) + "\n"
+        return output_str
+
+
+
 class TemplateLearner(Learner):
 
     def __init__(self, solver_instance: LPSolver, eval_fn: EvalFunction, do_print=False):
@@ -45,6 +69,12 @@ class TemplateLearner(Learner):
         self._candidate_pool = []
         self._eval_fn = eval_fn
         self._print = do_print
+        
+        # Statistics about learning process
+        self._prolog_queries = 0
+        self._intermediate_coverage = []     # Coverage of examples after every iteration
+
+        super().__init__()
 
     def _assert_knowledge(self, knowledge: Knowledge):
         """
@@ -60,7 +90,7 @@ class TemplateLearner(Learner):
             # self._solver.assert_rule(clauses[cl_ind])
             self._solver.assertz(clauses[cl_ind])
 
-    def _execute_program(self, clause: Clause) -> typing.Sequence[Atom]:
+    def _execute_program(self, clause: Clause, count_as_query=True) -> typing.Sequence[Atom]:
         """
         Evaluates a clause using the Prolog engine and background knowledge
 
@@ -73,6 +103,8 @@ class TemplateLearner(Learner):
             head_variables = clause.get_head_variables()
 
             sols = self._solver.query(*clause.get_body().get_literals())
+
+            self._prolog_queries += 1 if count_as_query else 0
 
             sols = [head_predicate(*[s[v] for v in head_variables]) for s in sols]
 
@@ -213,13 +245,31 @@ class TemplateLearner(Learner):
             # update covered positive examples
             covered = self._execute_program(cl)
 
+            # Find intermediate quality of program at this point, add to learnresult (don't cound these as Prolog queries)
+            c = set()
+            for cl in final_program:
+                c = c.union(self._execute_program(cl,count_as_query=False))
+            pos_covered = len(c.intersection(examples._positive_examples))
+            neg_covered = len(c.intersection(examples._negative_examples))
+            self.__intermediate_coverage.append((pos_covered,neg_covered))
+
+            # Remove covered examples and start next iteration
             pos, neg = examples_to_use.get_examples()
             pos = pos.difference(covered)
 
             examples_to_use = Task(pos, neg)
             i += 1
 
+        total_time = (datetime.datetime.now()-start).total_seconds()
         if self._print:
-            print("Done! Search took {:.5f} seconds.".format((datetime.datetime.now()-start).total_seconds()))
+            print("Done! Search took {:.5f} seconds.".format(total_time))
 
-        return final_program
+        # Wrap results into learnresult and return
+        self._learnresult["final_program"] = final_program
+        self._learnresult["total_time"] = total_time
+        self._learnresult["num_iterations"] = i
+        self._learnresult["evalfn_evaluations"] = self._eval_fn._clauses_evaluated
+        self._learnresult["prolog_queries"] = self._prolog_queries
+        self._learnresult["intermediate_coverage"] = self._intermediate_coverage
+
+        return self._learnresult

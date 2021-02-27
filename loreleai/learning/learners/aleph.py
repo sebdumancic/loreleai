@@ -2,8 +2,9 @@ import typing
 from abc import ABC, abstractmethod
 from typing import Sequence, Dict, Tuple
 from orderedset import OrderedSet
+import datetime
 
-from loreleai.learning.abstract_learners import Learner, TemplateLearner
+from loreleai.learning.abstract_learners import Learner, TemplateLearner, LearnResult
 from loreleai.learning import Task, Knowledge, HypothesisSpace, TopDownHypothesisSpace
 from loreleai.language.lp import (
     Clause,
@@ -67,17 +68,26 @@ class Aleph(TemplateLearner):
         Return to step 1.
         (Description from Cropper and Dumancic )
         """
+
+        # Variables for learning statics
+        start_time = datetime.datetime.now()
+        i = 0
+        stop = False
+        self._learnresult = LearnResult()   # Reset in case the learner is reused
+        self._prolog_queries = 0
+        self._intermediate_coverage = []
+        self._eval_fn._clauses_evaluated = 0
+
+        # Assert all BK into engines
+        self._solver.retract_all()
         self._assert_knowledge(knowledge)
 
+        # Start with all examples
         examples_to_use = examples
         pos, _ = examples_to_use.get_examples()
 
         # List of clauses we're learning
         prog = []
-
-        i = 1
-        stop = False
-
 
         # parameters for aleph_extension()
         allowed_positions = find_allowed_positions(knowledge)
@@ -88,6 +98,8 @@ class Aleph(TemplateLearner):
             allowed_constants = None
 
         while len(pos) > 0 and not stop:
+            i += 1
+
             # Pick example from pos
             pos_ex = Clause(list(pos)[0], [])
             bk = knowledge.as_clauses()
@@ -109,8 +121,6 @@ class Aleph(TemplateLearner):
                 allowed = lambda l: isinstance(l,Constant) or isinstance(l,int)
             else:
                 allowed = lambda l: (isinstance(l,Constant) and l in allowed_constants) or isinstance(l,int)
-
-            # print("All arguments: {}".format(bottom.get_body().get_arguments()))
 
             constants = list(set(list(filter(
                 allowed,
@@ -150,6 +160,16 @@ class Aleph(TemplateLearner):
                         len(pos.intersection(covered)), pos.intersection(covered)
                     )
                 )
+
+            # Find intermediate quality of program at this point, add to learnresult (don't cound these as Prolog queries)
+            c = set()
+            for cl in prog:
+                c = c.union(self._execute_program(cl,count_as_query=False))
+            pos_covered = len(c.intersection(examples._positive_examples))
+            neg_covered = len(c.intersection(examples._negative_examples))
+            self._intermediate_coverage.append((pos_covered,neg_covered))
+
+            # Remove covered examples and start next iteration
             pos, neg = examples_to_use.get_examples()
             pos = pos.difference(covered)
             examples_to_use = Task(pos, neg)
@@ -157,9 +177,17 @@ class Aleph(TemplateLearner):
             if self._print:
                 print("Finished iteration {}".format(i))
                 # print("Current program: {}".format(str(prog)))
-            i += 1
 
-        return prog
+        # Wrap results into learnresult and return
+        self._learnresult['learner'] = "Aleph"
+        self._learnresult["total_time"] = (datetime.datetime.now() - start_time).total_seconds()
+        self._learnresult["final_program"] = prog
+        self._learnresult["num_iterations"] = i
+        self._learnresult["evalfn_evaluations"] = self._eval_fn._clauses_evaluated
+        self._learnresult["prolog_queries"] = self._prolog_queries
+        self._learnresult["intermediate_coverage"] = self._intermediate_coverage
+
+        return self._learnresult
 
     def initialise_pool(self):
         self._candidate_pool = OrderedSet()
@@ -216,7 +244,7 @@ class Aleph(TemplateLearner):
 
         return new_exps
 
-    def _execute_program(self, clause: Clause) -> typing.Sequence[Atom]:
+    def _execute_program(self, clause: Clause, count_as_query: bool = True) -> typing.Sequence[Atom]:
         """
         Evaluates a clause using the Prolog engine and background knowledge
 
@@ -231,6 +259,7 @@ class Aleph(TemplateLearner):
             # print("{}({})".format(head_predicate, *head_args))
 
             sols = self._solver.query(*clause.get_body().get_literals())
+            self._prolog_queries += 1 if count_as_query else 0
 
             # Build a solution by substituting Variables with their found value
             # and copying constants without change
@@ -296,8 +325,6 @@ class Aleph(TemplateLearner):
                         len_before = len(self._candidate_pool)
                         self.prune_pool(value[c])
                         len_after = len(self._candidate_pool)
-
-                        print("Found new best: {}: {} {}".format(c,self._eval_fn.name(),value[c]))
 
                         if self._print:
                             print("Found new best: {}: {} {}".format(c,self._eval_fn.name(),value[c]))

@@ -66,11 +66,8 @@ def learn_with_constants():
                     for eval_fn in [eval_fn1,eval_fn3]]
 
     for learner in learners:
-        start = datetime.datetime.now()
-        prog = learner.learn(task,bk,None,minimum_freq=1)
-        end = datetime.datetime.now()
-        print("Final program: {}".format(str(prog)))
-        print("Learning took {}s, and {} clauses were considered.".format((end-start).total_seconds(),learner._eval_fn._clauses_evaluated))
+        res = learner.learn(task,bk,None,minimum_freq=1)
+        print(res)
     
 
 def learn_text():
@@ -128,12 +125,9 @@ def learn_text():
         neg = {f1(x) for x in [node1,node2,node3,blue,green,red]}
         pos = {f1(x) for x in [a_c,b_c,c_c]}
         task = Task(positive_examples=pos, negative_examples=neg)
-        start = datetime.datetime.now()
-        prog = learner.learn(task,bk,None)
-        end = datetime.datetime.now()
-        print("Final program: {}".format(str(prog)))
-        print("Learning took {}s, and {} clauses were considered.".format((end-start).total_seconds(),learner._eval_fn._clauses_evaluated))
-
+        
+        res = learner.learn(task,bk,None)
+        print(res)
 
     # 2. Consider the hypothesis: f2(word) :- word is the first word on a line
     if True:
@@ -141,11 +135,9 @@ def learn_text():
         neg = {f1(x) for x in [a_c,b_c,c_c,blue,green,red]}
         pos = {f1(x) for x in [node1,node2,node3]}
         task2 = Task(positive_examples=pos, negative_examples=neg)
-        start = datetime.datetime.now()
-        prog = learner.learn(task2,bk,None)
-        end = datetime.datetime.now()
-        print("Final program: {}".format(str(prog)))
-        print("Learning took {}s, and {} clauses were considered.".format((end-start).total_seconds(),learner._eval_fn._clauses_evaluated))
+
+        res = learner.learn(task2,bk,None)
+        print(res)
 
     # 3. Assume we have learned the predicate node(X) before (A, B and C and nodes).
     # We want to learn f3(Node,X) :- X is the next token after Node
@@ -168,12 +160,11 @@ def learn_text():
                nodecolor(b_c,red),nodecolor(c_c,red),nodecolor(c_c,green)
             }
         task3 = Task(positive_examples=pos, negative_examples=neg)
-        start = datetime.datetime.now()
+
         # prog = learner.learn(task3,bk,None,initial_clause=Body(node(a),color(b)))
-        prog = learner.learn(task3,bk,None,initial_clause=Body(node(a),color(b)),minimum_freq=3)
-        end = datetime.datetime.now()
-        print("Final program: {}".format(str(prog)))
-        print("Learning took {}s, and {} clauses were considered.".format((end-start).total_seconds(),learner._eval_fn._clauses_evaluated))        
+        result = learner.learn(task3,bk,None,initial_clause=Body(node(a),color(b)),minimum_freq=3)
+        print(result)
+            
         
 
 def learn_simpsons():    
@@ -225,11 +216,8 @@ def learn_simpsons():
     learner2 = Aleph(solver,eval_fn2,max_body_literals=4,do_print=False)
     learner3 = Aleph(solver,eval_fn3,max_body_literals=4,do_print=False)
 
-    start = datetime.datetime.now()
-    pr = learner.learn(task,background,None)
-    end = datetime.datetime.now()
-    print("Final program: {}".format(str(pr)))
-    print("Learning took {}s, and {} clauses were considered.".format((end-start).total_seconds(),learner._eval_fn._clauses_evaluated))
+    result = learner.learn(task,background,None)
+    print(result)
 
     # pr = learner2.learn(task,background,None)
     # print("Final program: {}".format(str(pr)))
