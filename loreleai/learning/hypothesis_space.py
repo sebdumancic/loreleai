@@ -4,6 +4,7 @@ from functools import reduce
 from itertools import combinations_with_replacement, combinations
 
 import networkx as nx
+from networkx.classes.function import create_empty_copy
 from orderedset import OrderedSet
 
 from loreleai.language.lp import (
@@ -120,7 +121,9 @@ class TopDownHypothesisSpace(HypothesisSpace):
         recursive_procedures: bool = False,
         repetitions_in_head_variables: int = 2,
         expansion_hooks_keep: typing.Sequence = (),
-        expansion_hooks_reject: typing.Sequence = ()
+        expansion_hooks_reject: typing.Sequence = (),
+        constants = None,
+        initial_clause: typing.Union[Clause,Body] = None
     ):
         super().__init__(
             primitives,
@@ -135,12 +138,14 @@ class TopDownHypothesisSpace(HypothesisSpace):
         self._repetition_vars_head = repetitions_in_head_variables
         self._invented_predicate_count = 0
         self._recursive_pointers_count = 0
+        self._constants = constants
         self._recursive_pointer_prefix = "rec"
-        self.initialise()
+        self.initialise(initial_clause)
 
-    def initialise(self) -> None:
+    def initialise(self,initial_clause: typing.Union[Clause,Body]) -> None:
         """
-        Initialises the search space
+        Initialises the search space. It is possible to provide an initial
+        clause to initialize the hypothesis space with (instead of :-). 
         """
         if isinstance(self._head_constructor, (Predicate, FillerPredicate)):
             if isinstance(self._head_constructor, Predicate):
@@ -156,8 +161,14 @@ class TopDownHypothesisSpace(HypothesisSpace):
             else:
                 possible_heads = self._head_constructor.all_possible_atoms()
 
-            # create empty clause
-            clause = Body()
+            # create empty clause or use initial clause
+            if initial_clause:
+                clause = initial_clause if isinstance(initial_clause,Body) else initial_clause.get_body() 
+            else:
+                clause = Body()
+            if len(clause.get_literals()) > 0 and len(clause.get_variables()) < self._head_constructor.get_arity():
+                raise AssertionError("Cannot provide an initial clause with fewer distinct variables than the head predicate!")
+
             init_head_dict = {"ignored": False, "blocked": False, "visited": False}
             self._hypothesis_space.add_node(clause)
             self._hypothesis_space.nodes[clause]["heads"] = dict([(x, init_head_dict.copy()) for x in possible_heads])
@@ -273,6 +284,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
 
             return True
         else:
+            # print("No possible heads")
             return False
 
     def _insert_edge(self, parent: Body, child: Body,) -> None:
@@ -298,6 +310,8 @@ class TopDownHypothesisSpace(HypothesisSpace):
         else:
             head, body = node.get_head(), node.get_body()
             if head in self._hypothesis_space.nodes[body]["heads"]:
+                if "cache" not in self._hypothesis_space.nodes[body]["heads"][head]:
+                    self._hypothesis_space.nodes[body]["heads"][head]["cache"] = {}
                 self._hypothesis_space.nodes[body]["heads"][head]["cache"][key] = val
 
     def retrieve_from_cache(self, node: typing.Union[Clause, Procedure], key):
@@ -313,7 +327,9 @@ class TopDownHypothesisSpace(HypothesisSpace):
             raise NotImplementedError("no support for caching with procedures currently")
         else:
             head, body = node.get_head(), node.get_body()
-            if head in self._hypothesis_space.nodes[body]["heads"]:
+            if head in self._hypothesis_space.nodes[body]["heads"]  \
+                and "cache" in self._hypothesis_space.nodes[body]["heads"][head] \
+                    and key in self._hypothesis_space.nodes[body]["heads"][head]["cache"]:
                 return self._hypothesis_space.nodes[body]["heads"][head]["cache"][key]
             else:
                 return None
@@ -357,6 +373,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
         """
         expansions = OrderedSet()
 
+        # Add the result of applying a primitive
         for item in range(len(self._primitives)):
             exp = self._primitives[item](node)
             expansions = expansions.union(exp)
@@ -367,7 +384,6 @@ class TopDownHypothesisSpace(HypothesisSpace):
             for r_ind in range(len(recursive_cases)):
                 expansions = expansions.union([node + recursive_cases[r_ind]])
 
-        expansions = list(expansions)
 
         # add expansions to the hypothesis space
         # if self._insert_node returns False, forget the expansion
@@ -376,6 +392,8 @@ class TopDownHypothesisSpace(HypothesisSpace):
             r = self._insert_node(expansions[exp_ind])
             if r:
                 expansions_to_consider.append(expansions[exp_ind])
+            # else:
+            #     print("Rejected: {}".format(expansions[exp_ind]))
 
         expansions = expansions_to_consider
 
@@ -672,3 +690,5 @@ class TopDownHypothesisSpace(HypothesisSpace):
             body = self._extract_body(node)
             return reduce(lambda x, y: x + y, [self.retrieve_clauses_from_body(x) for x in self._hypothesis_space.successors(body)], [])
 
+    def remove_all_edges(self):
+        self._hypothesis_space = create_empty_copy(self._hypothesis_space,with_data=True)

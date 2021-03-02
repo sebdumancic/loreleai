@@ -30,6 +30,23 @@ class Knowledge:
     def get_atoms(self):
         return [x for x in self._knowledge_pieces if isinstance(x, Atom)]
 
+    def as_clauses(self):
+        l = []
+        for x in self.get_all():
+            if isinstance(x,Clause):
+                l.append(x)
+            elif isinstance(x,Atom):
+                l.append(Clause(x,[]))
+            elif isinstance(x,Procedure):
+                for cl in x.get_clauses():
+                    l.append(cl)
+            elif isinstance(x,Program):
+                for cl in x.get_clauses():
+                    l.append(cl)
+            else:
+                raise AssertionError("Knowledge can only contain clauses, atoms, procedures or programs!")
+        return l
+
 
 class Interpretation:
 

@@ -4,3 +4,4 @@ from .language_filtering import has_singleton_vars, has_duplicated_literal, max_
 from .language_manipulation import plain_extension
 from .task import Knowledge, Interpretation, Task
 from .utilities import FillerPredicate, are_variables_connected
+from .abstract_learners import TemplateLearner
