@@ -49,7 +49,9 @@ def new_variable(
 """
 
 def _plain_extend_clause(
-    clause: typing.Union[Clause, Body], predicate: Predicate, connected_clause: bool = True
+        clause: typing.Union[Clause, Body],
+        predicate: Predicate,
+        connected_clause: bool = True
 ) -> typing.Sequence[typing.Union[Clause, Body]]:
     """
     Extends the clause with the predicate in every possible way (no bias)

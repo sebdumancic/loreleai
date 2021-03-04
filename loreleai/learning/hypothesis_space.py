@@ -16,6 +16,7 @@ from loreleai.language.lp import (
     Recursion,
 )
 from loreleai.learning.utilities import FillerPredicate
+from loreleai.learning.language_manipulation import plain_extension
 
 
 class HypothesisSpace(ABC):
@@ -37,6 +38,7 @@ class HypothesisSpace(ABC):
         self._hypothesis_space = None
         self._connected_clauses = connected_clauses
         self._use_recursions = recursive_procedures
+        self._recursive_expansion = lambda x: plain_extension(x, self._head_constructor, connected_clauses=True) if (self._use_recursions and isinstance(self._head_constructor, Predicate)) else None
         self._pointers: typing.Dict[str, Body] = {"main": None}
         self._expansion_hooks_keep = expansion_hooks_keep
         self._expansion_hooks_reject = expansion_hooks_reject
@@ -122,7 +124,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
         repetitions_in_head_variables: int = 2,
         expansion_hooks_keep: typing.Sequence = (),
         expansion_hooks_reject: typing.Sequence = (),
-        constants = None,
+        constants=None,
         initial_clause: typing.Union[Clause,Body] = None
     ):
         super().__init__(
@@ -142,7 +144,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
         self._recursive_pointer_prefix = "rec"
         self.initialise(initial_clause)
 
-    def initialise(self,initial_clause: typing.Union[Clause,Body]) -> None:
+    def initialise(self, initial_clause: typing.Union[Clause,Body]) -> None:
         """
         Initialises the search space. It is possible to provide an initial
         clause to initialize the hypothesis space with (instead of :-). 
@@ -349,7 +351,6 @@ class TopDownHypothesisSpace(HypothesisSpace):
             if head in self._hypothesis_space.nodes[body]["heads"]:
                 del self._hypothesis_space.nodes[body]["heads"][head]["cache"][key]
 
-
     def register_pointer(self, name: str, init_value: Body = None):
         """
         Registers a new pointer. If init_value is None, assigns it to the root note
@@ -379,11 +380,16 @@ class TopDownHypothesisSpace(HypothesisSpace):
             expansions = expansions.union(exp)
 
         # if recursions should be enumerated when FillerPredicate is used to construct the heads
-        if isinstance(self._head_constructor, FillerPredicate) and self._use_recursions:
-            recursive_cases = self._head_constructor.add_to_body(node)
+        if self._use_recursions:
+            if isinstance(self._head_constructor, FillerPredicate):
+                recursive_cases = self._head_constructor.add_to_body(node)
+            elif isinstance(self._head_constructor, Predicate):
+                recursive_cases = self._recursive_expansion(node)
+            else:
+                raise Exception(f"Unknown head constructor ({type(self._head_constructor)})")
+
             for r_ind in range(len(recursive_cases)):
                 expansions = expansions.union([node + recursive_cases[r_ind]])
-
 
         # add expansions to the hypothesis space
         # if self._insert_node returns False, forget the expansion
@@ -431,7 +437,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
 
         if (
             "partner" in self._hypothesis_space.nodes[body]
-            or "blocked" in self._hypothesis_space.nodes[body]
+            or self._hypothesis_space.nodes[body]["blocked"]
         ):
             # do not expand recursions or blocked nodes
             return []
@@ -446,7 +452,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
 
         return reduce(
             lambda x, y: x + y,
-            [self.retrieve_clauses_from_body(x) for x in expansions],
+            [self.retrieve_clauses_from_body(x) if "partner" not in self._hypothesis_space.nodes[x] else self._get_recursions(x) for x in expansions],
             [],
         )
 
