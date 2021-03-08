@@ -437,7 +437,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
 
         if (
             "partner" in self._hypothesis_space.nodes[body]
-            or self._hypothesis_space.nodes[body]["blocked"]
+            or self._hypothesis_space.nodes[body].get("blocked", False)
         ):
             # do not expand recursions or blocked nodes
             return []
