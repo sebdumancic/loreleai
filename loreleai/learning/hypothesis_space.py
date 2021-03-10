@@ -225,7 +225,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
             - a predicate constructed by FillerPredicate is in the body
         """
         if isinstance(self._head_constructor, Predicate):
-            return True if self._head_constructor is body.get_predicates() else False
+            return True if self._head_constructor in body.get_predicates() else False
         else:
             return (
                 True

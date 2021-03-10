@@ -177,6 +177,21 @@ class HypothesisSpace():
         exps2 = hs.expand(exps[0])
         assert len(exps2) == 4
 
+    def recursions(self):
+        parent = c_pred("parent", 2)
+        ancestor = c_pred("ancestor", 2)
+
+        hs = TopDownHypothesisSpace(primitives=[lambda x: plain_extension(x, parent, connected_clauses=True)],
+                                    head_constructor=ancestor,
+                                    recursive_procedures=True)
+
+        cls = hs.get_current_candidate()
+        cls2 = hs.expand(cls[1])
+        print(cls2)
+
+
+
+
 
 def test_language():
     test = LanguageTest()
@@ -186,10 +201,11 @@ def test_language():
     test_bias.plain_clause_extensions()
     test_bias.plain_clause_extensions_connected()
     test_bias.plain_procedure_extension()
-
+    #
     test_hypothesis_space = HypothesisSpace()
     test_hypothesis_space.top_down_plain()
     test_hypothesis_space.top_down_limited()
     test_hypothesis_space.bottom_up()
+    test_hypothesis_space.recursions()
 
 test_language()
