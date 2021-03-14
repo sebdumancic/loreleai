@@ -691,7 +691,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
         Returns all successors of the node
         """
         if isinstance(node, Body):
-            return list(self._hypothesis_space.successors(node))
+            return reduce(lambda x, y: x + y, [self.retrieve_clauses_from_body(x) for x in self._hypothesis_space.successors(node)], [])
         else:
             body = self._extract_body(node)
             return reduce(lambda x, y: x + y, [self.retrieve_clauses_from_body(x) for x in self._hypothesis_space.successors(body)], [])
