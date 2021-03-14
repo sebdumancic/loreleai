@@ -691,10 +691,10 @@ class TopDownHypothesisSpace(HypothesisSpace):
         Returns all successors of the node
         """
         if isinstance(node, Body):
-            return reduce(lambda x, y: x + y, [self.retrieve_clauses_from_body(x) for x in self._hypothesis_space.successors(node)], [])
+            return reduce(lambda x, y: x + y, [self.retrieve_clauses_from_body(x) if not self._check_if_recursive(x) else self._get_recursions(x) for x in self._hypothesis_space.successors(node)], [])
         else:
             body = self._extract_body(node)
-            return reduce(lambda x, y: x + y, [self.retrieve_clauses_from_body(x) for x in self._hypothesis_space.successors(body)], [])
+            return reduce(lambda x, y: x + y, [self.retrieve_clauses_from_body(x) if not self._check_if_recursive(x) else self._get_recursions(x) for x in self._hypothesis_space.successors(body)], [])
 
     def remove_all_edges(self):
         self._hypothesis_space = create_empty_copy(self._hypothesis_space,with_data=True)
