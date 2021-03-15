@@ -2,6 +2,7 @@
  - added cache support in hypothesis space
  - hypothesis space returns recursions with Predicate as head_constructor
  - fixed recursion generation
+ - when accessing recursion in hypothesis space, the partner pointer is always reset to the root (so that get_successors work)
 
 # 0.1.3
  - added pair from pylo

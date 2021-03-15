@@ -605,7 +605,8 @@ class TopDownHypothesisSpace(HypothesisSpace):
             self.reset_pointer(pointer_name, init_pointer_value)
 
         # set the pointer to the last explored clause
-        self.reset_pointer(pointer_name, last_pointer_value)
+        # set the point to the root, by default
+        self.reset_pointer(pointer_name) #, last_pointer_value)
 
         return recursions
 
