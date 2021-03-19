@@ -389,7 +389,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
                 raise Exception(f"Unknown head constructor ({type(self._head_constructor)})")
 
             for r_ind in range(len(recursive_cases)):
-                expansions = expansions.union([node + recursive_cases[r_ind]])
+                expansions = expansions.union([recursive_cases[r_ind]])
 
         # add expansions to the hypothesis space
         # if self._insert_node returns False, forget the expansion
@@ -433,7 +433,7 @@ class TopDownHypothesisSpace(HypothesisSpace):
         returns the expanded constructs
         if already expanded, returns an empty list
         """
-        body = node.get_body()
+        body = self._extract_body(node)
 
         if (
             "partner" in self._hypothesis_space.nodes[body]
